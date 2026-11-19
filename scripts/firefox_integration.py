@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser()
     for name in ['exe', 'firefox', 'driver', 'extension']:
         parser.add_argument('--' + name, required=True, type=pathlib.Path)
+    parser.add_argument('--engine', default='odm-test-no-aria2', help='Optional aria2 path for older ODM compatibility tests')
     args = parser.parse_args()
     paths = {name: str(getattr(args, name).resolve()) for name in ['exe', 'firefox', 'driver', 'extension']}
     for value in paths.values():
@@ -33,7 +34,7 @@ def main():
     flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
     with tempfile.TemporaryDirectory(prefix='odm-firefox-') as temp:
         scratch = pathlib.Path(temp)
-        backend = subprocess.Popen([paths['exe'], '--no-browser', '--engine', 'odm-test-no-aria2',
+        backend = subprocess.Popen([paths['exe'], '--no-browser', '--engine', args.engine,
             '--data-dir', str(scratch / 'data'), '--downloads', str(scratch / 'files')],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, creationflags=flags)
         driver = None
@@ -51,7 +52,7 @@ def main():
             except urllib.error.HTTPError as error:
                 # Never echo browser script arguments or pairing credentials.
                 detail = json.load(error).get('value', {})
-                message = str(detail.get('message', '')).splitlines()[0][:350]
+                message = next(iter(str(detail.get('message', '')).splitlines()), '')[:350]
                 message = re.sub(r'[a-f0-9]{64}', '[private token]', message)
                 raise RuntimeError('Local test endpoint rejected a request: ' + str(error.code) + ' ' + message) from None
 

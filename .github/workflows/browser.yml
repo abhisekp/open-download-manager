@@ -1,0 +1,49 @@
+name: Installed browser companion
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: browser-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  firefox:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.11.1'
+          package-manager-cache: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build companion and backend from this source
+        run: |
+          python scripts/version.py --check
+          if ($LASTEXITCODE) {throw 'Version check failed'}
+          npm ci --prefix ui --ignore-scripts
+          if ($LASTEXITCODE) {throw 'UI dependencies failed'}
+          npm run build --prefix ui
+          if ($LASTEXITCODE) {throw 'UI build failed'}
+          go build -o odm-firefox-qa.exe .
+          if ($LASTEXITCODE) {throw 'Backend build failed'}
+          python scripts/extensions.py
+          if ($LASTEXITCODE) {throw 'Companion build failed'}
+      - name: Prepare pinned verified browser tools
+        run: ./scripts/prepare_firefox.ps1 -Destination (Join-Path $env:RUNNER_TEMP 'odm-browser-tools')
+      - name: Exercise installed Firefox companion with real transfer and revocation
+        run: |
+          $tools=Join-Path $env:RUNNER_TEMP 'odm-browser-tools'
+          $versions=& ./scripts/version.ps1
+          python scripts/firefox_integration.py --exe odm-firefox-qa.exe --firefox (Join-Path $tools 'firefox/core/firefox.exe') --driver (Join-Path $tools 'driver/geckodriver.exe') --extension "dist/odm-extension-firefox-$($versions.browser).zip"
+          if ($LASTEXITCODE) {throw 'Installed companion test failed'}
