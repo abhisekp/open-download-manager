@@ -1,10 +1,10 @@
 # Microsoft Store submission preparation
 
-Status: blocked on Partner Center registration and name reservation. The owner confirmed on 2026-11-19 that neither is set up. No account was created, agreement accepted, fee paid or submission sent by this work.
+Status: no ODM name reservation or Windows signing certificate/service, as confirmed by the owner on 2026-11-19. Windows developer enrollment is unverified; absence of enrollment was not established by that answer. No account was created, agreement accepted, fee paid or submission sent by this work.
 
 ## Required owner setup
 
-1. Register as a Windows app developer in Partner Center and complete Microsoft's identity verification and developer agreement.
+1. Inspect the existing Partner Center Windows developer workspace. Register and complete identity verification/developer agreements only if needed, with owner acceptance of legal terms or fees.
 2. Reserve the intended product name. Availability of “Open Download Manager” has not been verified.
 3. Copy the package identity Name, Publisher and Store product ID from the reserved product. These are identifiers, not credentials; never substitute development values.
 4. Review the actual product description, privacy/support pages, age ratings, capabilities and distribution choices. Upload genuine screenshots of the packaged app; existing design mock-ups are not certification evidence.
