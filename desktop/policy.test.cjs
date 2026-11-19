@@ -1,7 +1,8 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { launchAddress, localResource, documentNavigation } = require('./policy.cjs');
+const path = require('node:path');
+const { launchAddress, localResource, documentNavigation, dataPaths } = require('./policy.cjs');
 const line = 'Open Download Manager: http://127.0.0.1:8431/#' + 'a'.repeat(64);
 test('only the exact loopback launch protocol is accepted', () => {
   assert.ok(launchAddress(line));
@@ -18,4 +19,12 @@ test('renderer resources and navigation stay on the owned backend', () => {
   }
   assert.equal(documentNavigation(address, address.origin + '/api/status'), false);
   assert.equal(documentNavigation(address, address.origin + '/?remote=1'), false);
+});
+test('custom profiles accept only explicit absolute directory options', () => {
+  const folder = path.resolve('test-profile');
+  assert.deepEqual(dataPaths(['--data-dir', folder, '--engine', 'untrusted-command']), {'data-dir': folder});
+  assert.deepEqual(dataPaths(['--downloads=' + folder]), {downloads: folder});
+  for (const args of [['--data-dir'], ['--data-dir=relative'], ['--data-dir', folder + '\n'], ['--data-dir', folder, '--data-dir', folder]]) {
+    assert.throws(() => dataPaths(args));
+  }
 });

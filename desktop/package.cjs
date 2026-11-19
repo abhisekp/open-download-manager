@@ -1,6 +1,7 @@
 'use strict';
 const path = require('node:path');
 const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
 const { packager } = require('@electron/packager');
 const platform = process.platform;
 const arch = process.arch;
@@ -8,9 +9,13 @@ if (!['win32', 'linux', 'darwin'].includes(platform) || !['x64', 'arm64'].includ
   throw new Error('This desktop runtime supports x64/arm64 only. Use the portable browser-interface build on other targets.');
 }
 const resources = path.join(__dirname, 'resources');
+const version = fs.readFileSync(path.join(__dirname, '../VERSION'), 'utf8').trim();
+if (require('./package.json').version !== version || require('./package-lock.json').version !== version) throw new Error('Desktop metadata must match VERSION');
 for (const name of ['backend', 'odm-icon.png', 'ODM-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt']) {
   if (!fs.existsSync(path.join(resources, name))) throw new Error('Missing prepared desktop resource: ' + name);
 }
+const backend = path.join(resources, 'backend', platform === 'win32' ? 'odm.exe' : 'odm');
+if (execFileSync(backend, ['--version'], {encoding:'utf8', timeout:10000, windowsHide:true}).trim() !== version) throw new Error('Rebuild the backend for the current VERSION before packaging');
 packager({
   dir: __dirname, name: 'Open Download Manager', executableName: 'open-download-manager',
   platform, arch, electronVersion: require('./package.json').devDependencies.electron,

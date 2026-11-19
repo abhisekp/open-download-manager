@@ -6,6 +6,7 @@ import pathlib
 import tarfile
 import xml.etree.ElementTree as ET
 import zipfile
+from version import VERSION, VERSIONS
 
 
 def verify_deb(path, arch):
@@ -47,7 +48,7 @@ def verify(dist, kind):
                                         ('linux', ['386', 'amd64', 'arm', 'arm64'], '.tar.gz'),
                                         ('darwin', ['amd64', 'arm64'], '.tar.gz')]:
             for arch in arches:
-                name = f'odm-0.1.0-dev-{system}-{arch}{suffix}'
+                name = f'odm-{VERSION}-{system}-{arch}{suffix}'
                 expected.append(name)
                 if suffix == '.zip':
                     with zipfile.ZipFile(dist / name) as archive:
@@ -61,13 +62,13 @@ def verify(dist, kind):
                                  'odm.exe' if system == 'windows' else 'odm']:
                     if not any(member.endswith('/' + required) for member in members):
                         raise ValueError(f'{name} missing {required}')
-        expected += [f'open-download-manager_0.1.0-dev_{arch}.deb' for arch in ['i386', 'amd64', 'armhf', 'arm64']]
+        expected += [f'open-download-manager_{VERSION}_{arch}.deb' for arch in ['i386', 'amd64', 'armhf', 'arm64']]
         for arch in ['i386', 'amd64', 'armhf', 'arm64']:
-            verify_deb(dist / f'open-download-manager_0.1.0-dev_{arch}.deb', arch)
-        expected += [f'odm-extension-{browser}-0.1.0.zip' for browser in ['chromium', 'firefox', 'safari-source']]
+            verify_deb(dist / f'open-download-manager_{VERSION}_{arch}.deb', arch)
+        expected += [f'odm-extension-{browser}-{VERSIONS["browser"]}.zip' for browser in ['chromium', 'firefox', 'safari-source']]
     else:
         for arch in ['x86', 'x64', 'arm64']:
-            name = f'odm-0.1.0.0-{arch}-unsigned.msix'
+            name = f'odm-{VERSIONS["msix"]}-{arch}-unsigned.msix'
             expected.append(name)
             with zipfile.ZipFile(dist / name) as archive:
                 if archive.testzip():

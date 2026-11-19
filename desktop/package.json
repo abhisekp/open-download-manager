@@ -1,6 +1,6 @@
 {
   "name": "open-download-manager-desktop",
-  "version": "0.1.0-dev",
+  "version": "0.2.0-dev",
   "private": true,
   "description": "Native desktop window for Open Download Manager",
   "author": "Open Download Manager contributors",

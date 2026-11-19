@@ -29,6 +29,7 @@ jobs:
           go version
           node --version
           python3 --version
+          python3 scripts/version.py --check
       - name: Build interface
         working-directory: ui
         run: |
@@ -70,8 +71,9 @@ jobs:
         run: bash scripts/linux_install_test.sh
       - name: Exercise Linux x86 and emulated ARMv7 binaries
         run: |
-          python3 scripts/native_mode_test.py --exe dist/odm-0.1.0-dev-linux-386/odm
-          printf '#!/usr/bin/env bash\nexec qemu-arm "%s/dist/odm-0.1.0-dev-linux-arm/odm" "$@"\n' "$GITHUB_WORKSPACE" > /tmp/odm-arm-test
+          version="$(python3 scripts/version.py)"
+          python3 scripts/native_mode_test.py --exe "dist/odm-$version-linux-386/odm"
+          printf '#!/usr/bin/env bash\nexec qemu-arm "%s/dist/odm-%s-linux-arm/odm" "$@"\n' "$GITHUB_WORKSPACE" "$version" > /tmp/odm-arm-test
           chmod +x /tmp/odm-arm-test
           python3 scripts/native_mode_test.py --exe /tmp/odm-arm-test
           python3 scripts/lock_recovery_test.py --exe /tmp/odm-arm-test

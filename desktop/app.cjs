@@ -3,12 +3,26 @@
 const { app, BrowserWindow, Menu, Tray, dialog, session, nativeImage } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
-const { launchAddress, localResource, documentNavigation } = require('./policy.cjs');
+const fs = require('node:fs');
+const { launchAddress, localResource, documentNavigation, dataPaths } = require('./policy.cjs');
 
 // No renderer preload, Node bridge, arbitrary external navigation or shell handoff.
 async function start(onReady, testResources) {
   app.enableSandbox();
   app.setName('Open Download Manager');
+  let directories;
+  try {
+    directories = dataPaths(process.argv);
+    if (directories['data-dir']) {
+      const profile = path.join(directories['data-dir'], 'desktop-profile');
+      fs.mkdirSync(profile, {recursive:true, mode:0o700});
+      app.setPath('userData', profile);
+    }
+  } catch {
+    await app.whenReady();
+    dialog.showErrorBox('Open Download Manager', 'The data/download directory could not be used. Choose an absolute path in a writable folder.');
+    app.exit(1); return;
+  }
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }
   let window, tray, backend, address, stopping = false, exited = false;
   const show = () => { if (window && !window.isDestroyed()) { window.show(); window.restore(); window.focus(); } };
@@ -57,10 +71,10 @@ async function start(onReady, testResources) {
     app.quit();
   };
   try {
-    // No user arguments are forwarded to the backend. Launch credentials stay in a pipe.
+    // Only the two directory options are accepted. Launch credentials stay in a pipe.
     backend = spawn(executable, ['--no-browser',
-      '--data-dir', path.join(app.getPath('appData'), 'OpenDownloadManager'),
-      '--downloads', path.join(app.getPath('downloads'), 'OpenDownloadManager')],
+      '--data-dir', directories['data-dir'] || path.join(app.getPath('appData'), 'OpenDownloadManager'),
+      '--downloads', directories.downloads || path.join(app.getPath('downloads'), 'OpenDownloadManager')],
     { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     backend.on('error', () => fail('The download service could not start. Reinstall the complete application package.'));
     backend.once('exit', code => {

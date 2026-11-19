@@ -12,6 +12,7 @@ import pathlib
 import subprocess
 import uuid
 from urllib.parse import quote
+from version import VERSION
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -102,7 +103,7 @@ def generate(dist):
            'metadata': {'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
                         'tools': {'components': [{'type': 'application', 'name': 'odm-sbom', 'version': '1'}]},
                         'component': {'type': 'application', 'name': 'Open Download Manager',
-                                      'version': '0.1.0-dev', 'bom-ref': root_ref,
+                                      'version': VERSION, 'bom-ref': root_ref,
                                       'licenses': [{'license': {'id': 'MIT'}}]},
                         'properties': [{'name': 'odm:source-commit', 'value': revision},
                                        {'name': 'odm:external-engine-bundled', 'value': 'false'},

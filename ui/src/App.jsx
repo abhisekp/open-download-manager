@@ -305,7 +305,7 @@ export function App() {
         </nav>
         <div className="sidebar-foot">
           Local. Open. Yours.
-          <small>Early development · {data.version || "0.1.0-dev"}</small>
+          <small>Early development · {data.version || "loading"}</small>
         </div>
       </aside>
       <main inert={Boolean(dialog || verifyTarget || removeTarget)}>

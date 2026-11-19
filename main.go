@@ -30,7 +30,11 @@ import (
 
 //go:embed ui/dist/client
 var assets embed.FS
-var version = "0.1.0-dev"
+
+//go:embed VERSION
+var versionFile string
+
+var version = strings.TrimSpace(versionFile)
 
 func token() string {
 	b := make([]byte, 32)

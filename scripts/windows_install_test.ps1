@@ -4,6 +4,8 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hoste
   throw 'This installation test requires a disposable GitHub-hosted runner.'
 }
 $identity='OpenDownloadManager.Development'
+$versions=& (Join-Path $PSScriptRoot 'version.ps1')
+$upgradeVersion=$versions.core+'.1'
 if (Get-AppxPackage -Name $identity) {throw 'Development package already installed; refusing to replace it.'}
 $testRoot=Join-Path $env:RUNNER_TEMP ('odm-install-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testRoot | Out-Null
@@ -16,23 +18,23 @@ try {
   $sdkRoot=Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
   $signer=Get-ChildItem -Path (Join-Path $sdkRoot '*/x64/signtool.exe') | Sort-Object FullName -Descending | Select-Object -First 1
   if (!$signer) {throw 'Windows SDK signtool missing'}
-  $original=Join-Path $PSScriptRoot '../dist/odm-0.1.0.0-x64-unsigned.msix'
+  $original=Join-Path $PSScriptRoot "../dist/odm-$($versions.msix)-x64-unsigned.msix"
   $signed=Join-Path $testRoot 'odm-test.msix'
   Copy-Item -LiteralPath $original -Destination $signed
   & $signer.FullName sign /fd SHA256 /sha1 $cert.Thumbprint /s My $signed
   if ($LASTEXITCODE) {throw 'Test signing failed'}
   Add-AppxPackage -Path $signed
   $installed=Get-AppxPackage -Name $identity
-  if (!$installed -or $installed.Version -ne '0.1.0.0') {throw 'Installation not registered'}
+  if (!$installed -or $installed.Version -ne $versions.msix) {throw 'Installation not registered'}
   python (Join-Path $PSScriptRoot 'native_mode_test.py') --exe (Join-Path $installed.InstallLocation 'odm.exe')
   if ($LASTEXITCODE) {throw 'Installed application test failed'}
-  & (Join-Path $PSScriptRoot 'package-msix.ps1') -Architecture x64 -IdentityName $identity -Publisher "CN=$identity" -PackageVersion '0.1.0.1' -OutputDirectory $testRoot
-  $upgrade=Join-Path $testRoot 'odm-0.1.0.1-x64-unsigned.msix'
+  & (Join-Path $PSScriptRoot 'package-msix.ps1') -Architecture x64 -IdentityName $identity -Publisher "CN=$identity" -PackageVersion $upgradeVersion -OutputDirectory $testRoot
+  $upgrade=Join-Path $testRoot "odm-$upgradeVersion-x64-unsigned.msix"
   & $signer.FullName sign /fd SHA256 /sha1 $cert.Thumbprint /s My $upgrade
   if ($LASTEXITCODE) {throw 'Upgrade test signing failed'}
   Add-AppxPackage -Path $upgrade
   $installed=Get-AppxPackage -Name $identity
-  if ($installed.Version -ne '0.1.0.1') {throw 'Upgrade version mismatch'}
+  if ($installed.Version -ne $upgradeVersion) {throw 'Upgrade version mismatch'}
   python (Join-Path $PSScriptRoot 'native_mode_test.py') --exe (Join-Path $installed.InstallLocation 'odm.exe')
   if ($LASTEXITCODE) {throw 'Upgraded application test failed'}
   Remove-AppxPackage -Package $installed.PackageFullName

@@ -2,13 +2,15 @@ param(
   [ValidateSet('x86','x64','arm64')][string]$Architecture='x64',
   [Parameter(Mandatory=$true)][ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$')][string]$IdentityName,
   [Parameter(Mandatory=$true)][string]$Publisher,
-  [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$PackageVersion='0.1.0.0',
+  [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$PackageVersion='',
   [string]$OutputDirectory=''
 )
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
+$versions=& (Join-Path $PSScriptRoot 'version.ps1')
+if (!$PackageVersion) {$PackageVersion=$versions.msix}
 $cpu=@{x86='386';x64='amd64';arm64='arm64'}[$Architecture]
-$binary=Join-Path $projectRoot "dist/odm-0.1.0-dev-windows-$cpu/odm.exe"
+$binary=Join-Path $projectRoot "dist/odm-$($versions.source)-windows-$cpu/odm.exe"
 if (!(Test-Path -LiteralPath $binary)) {throw 'Build the matching portable artifact first.'}
 $stage=Join-Path $projectRoot ('dist/msix-stage-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $stage 'Assets') -Force | Out-Null

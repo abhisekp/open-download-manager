@@ -6,6 +6,7 @@ import unittest
 import zipfile
 
 from verify_artifacts import verify
+from version import VERSIONS
 
 
 class PackageVerificationTests(unittest.TestCase):
@@ -14,7 +15,7 @@ class PackageVerificationTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.dist = pathlib.Path(self.temp.name)
         for arch in ['x86', 'x64', 'arm64']:
-            with zipfile.ZipFile(self.dist / f'odm-0.1.0.0-{arch}-unsigned.msix', 'w') as archive:
+            with zipfile.ZipFile(self.dist / f'odm-{VERSIONS["msix"]}-{arch}-unsigned.msix', 'w') as archive:
                 archive.writestr('AppxManifest.xml', f'<Package><Identity ProcessorArchitecture="{arch}"/></Package>')
                 for name in ['odm.exe', 'LICENSE', 'THIRD-PARTY-GO-NOTICES.txt']:
                     archive.writestr(name, 'test fixture')

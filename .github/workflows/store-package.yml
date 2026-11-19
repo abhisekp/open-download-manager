@@ -68,7 +68,9 @@ jobs:
         if: ${{ inputs.validation_only }}
         shell: pwsh
         run: |
-          python scripts/native_mode_test.py --exe dist/odm-0.1.0-dev-windows-386/odm.exe
+          $version=python scripts/version.py
+          if ($LASTEXITCODE) {throw 'Invalid application version'}
+          python scripts/native_mode_test.py --exe "dist/odm-$version-windows-386/odm.exe"
           if ($LASTEXITCODE) {throw 'Windows x86 runtime test failed'}
       - name: Test x64 MSIX installation and upgrade on disposable runner
         if: ${{ inputs.validation_only }}
@@ -167,7 +169,9 @@ jobs:
         if: ${{ inputs.validation_only }}
         shell: pwsh
         run: |
-          python scripts/native_mode_test.py --exe dist/odm-0.1.0-dev-windows-386/odm.exe
+          $version=python scripts/version.py
+          if ($LASTEXITCODE) {throw 'Invalid application version'}
+          python scripts/native_mode_test.py --exe "dist/odm-$version-windows-386/odm.exe"
           if ($LASTEXITCODE) {throw 'Windows x86 runtime test failed'}
       - name: Test x64 MSIX installation and upgrade on disposable runner
         if: ${{ inputs.validation_only }}

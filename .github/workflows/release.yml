@@ -15,8 +15,8 @@ on:
         default: main
         type: string
       tag:
-        description: Existing reviewed v0.1.0-dev tag (required for draft creation)
-        default: v0.1.0-dev
+        description: Existing reviewed tag matching VERSION (required for draft creation)
+        default: v0.2.0-dev
         type: string
 permissions:
   contents: read
@@ -58,12 +58,13 @@ jobs:
           git verify-commit --raw HEAD 2> signature.txt
           grep -q "VALIDSIG 0C11F14DCCBC95B710E92B988F9C80E5E7CE296A" signature.txt
           if [ "$VALIDATION_ONLY" != true ]; then
-            test "$TAG" = v0.1.0-dev
+            test "$TAG" = "v$(python3 scripts/version.py --check)"
             test "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$(git rev-parse HEAD)"
           fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Validate and build candidates
         run: |
+          python3 scripts/version.py --check
           npm ci --prefix ui --ignore-scripts
           npm run build --prefix ui
           npm run test:sites --prefix ui
@@ -144,7 +145,7 @@ jobs:
           SOURCE_SHA: ${{ needs.validate.outputs.sha }}
           TAG: ${{ inputs.tag }}
         run: |
-          test "$TAG" = v0.1.0-dev
+          test "$TAG" = "v$(python3 scripts/version.py --check)"
           test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)" = "$SOURCE_SHA"
           gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" -f head_sha="$SOURCE_SHA" -f status=success --jq '.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch") | .id' > ci-runs.txt
           test -s ci-runs.txt
@@ -177,7 +178,7 @@ jobs:
           SOURCE_SHA: ${{ needs.validate.outputs.sha }}
           TAG: ${{ inputs.tag }}
         run: |
-          test "$TAG" = v0.1.0-dev
+          test "$TAG" = "v$(python3 scripts/version.py --check)"
           test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)" = "$SOURCE_SHA"
           test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true
           gh release download "$TAG" --dir dist

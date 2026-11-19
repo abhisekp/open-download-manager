@@ -17,7 +17,9 @@ python scripts/verify_artifacts.py --kind portable
 
 Run **Prepare draft release** with `validation_only=true` (default) and `source_ref=main` or a signed commit SHA. This verifies the approved commit signer, runs quality gates, builds and inspects all 14 portable/Debian/extension archives, and uploads a `release-candidate` artifact. It creates no tag or release.
 
-To create a draft, first obtain approval for the exact source/version/artifacts and create the reviewed `v0.1.0-dev` tag. Dispatch with `validation_only=false` and that tag. The separate `draft` job requires the configured `release-approval` environment review, verifies that the tag still resolves to the validated SHA, requires successful CI for that exact SHA, downloads the same candidate artifacts and rechecks their digests. It creates an unpublished draft prerelease only. Publishing the draft is a separate approval and operation. Existing drafts fail safely instead of being overwritten.
+To create a draft, first obtain approval for the exact source/version/artifacts and create the reviewed tag matching `v` plus the root `VERSION` file. Dispatch with `validation_only=false` and that tag. The separate `draft` job requires the configured `release-approval` environment review, verifies that the tag still resolves to the validated SHA, requires successful CI for that exact SHA, downloads the same candidate artifacts and rechecks their digests. It creates an unpublished draft prerelease only. Publishing the draft is a separate approval and operation. Existing drafts fail safely instead of being overwritten.
+
+`VERSION` is the application source of truth. `scripts/version.py` validates its supported format and derives browser, Debian and MSIX versions. Desktop package metadata/lockfiles must match it and are checked in CI. Development source is now `0.2.0-dev`; changing this file does not create a tag or authorize a new release. The published `v0.1.0-dev` tag remains unchanged. Native desktop candidates use their own workflow and are not silently added to the portable/MSIX release contract.
 
 ## Windows package validation
 
