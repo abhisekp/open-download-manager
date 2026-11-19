@@ -10,6 +10,8 @@ require (
 	github.com/gofrs/flock v0.13.2
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/zeebo/bencode v1.0.0
+	go.etcd.io/bbolt v1.5.0
+	golang.org/x/time v0.16.0
 )
 
 require (
@@ -28,7 +30,6 @@ require (
 	github.com/nictuku/dht v0.0.0-20201226073453-fd1c1dd3d66a // indirect
 	github.com/nictuku/nettools v0.0.0-20150117095333-8867a2107ad3 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
-	go.etcd.io/bbolt v1.5.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 )
