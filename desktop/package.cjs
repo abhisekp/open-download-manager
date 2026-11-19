@@ -17,7 +17,9 @@ for (const name of ['backend', 'odm-icon.png', 'ODM-LICENSE.txt', 'THIRD-PARTY-N
 const backend = path.join(resources, 'backend', platform === 'win32' ? 'odm.exe' : 'odm');
 if (execFileSync(backend, ['--version'], {encoding:'utf8', timeout:10000, windowsHide:true}).trim() !== version) throw new Error('Rebuild the backend for the current VERSION before packaging');
 packager({
-  dir: __dirname, name: 'Open Download Manager', executableName: 'open-download-manager',
+  // Chromium's Linux setuid launcher currently splits paths containing spaces.
+  // Keep the distributed Linux directory name safe while retaining the UI brand.
+  dir: __dirname, name: platform === 'linux' ? 'open-download-manager' : 'Open Download Manager', executableName: 'open-download-manager',
   platform, arch, electronVersion: require('./package.json').devDependencies.electron,
   icon: path.join(resources, platform === 'win32' ? 'odm.ico' : platform === 'darwin' ? 'odm.icns' : 'odm-icon.png'),
   appVersion: require('./package.json').version, appBundleId: 'org.opendownloadmanager.desktop',

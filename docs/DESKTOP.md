@@ -26,6 +26,8 @@ node packaged-smoke.cjs
 
 Electron's reviewed installer downloads its pinned upstream runtime and verifies bundled checksums. Linux CI configures the runtime's setuid sandbox helper and runs the native window under Xvfb; it does not disable Chromium sandboxing. Packaged Linux distributions still need a correctly installed sandbox helper or a working supported user-namespace configuration. Test on the intended Linux distribution before distribution.
 
+Linux packages use a directory name without spaces. The actual-runtime test found Chromium's [setuid launcher path bug](https://github.com/electron/electron/issues/44414): a space in the installation path truncates its child executable path and aborts startup. Extract Linux desktop candidates under a parent path without spaces. This is an upstream runtime limitation; sandboxing is not disabled to work around it. Installers should use a fixed safe path such as `/opt/open-download-manager`.
+
 The separate desktop workflow builds and exercises six native targets: Windows x64/ARM64, Linux x64/ARM64 and macOS Intel/Apple Silicon. The current upstream Electron runtime does not provide Windows x86, Linux x86 or ARMv7 builds. Those three targets retain the existing portable Go service/browser interface. The nine portable targets remain independently built and tested.
 
 ## Distribution boundaries

@@ -19,7 +19,7 @@ Product: Open Download Manager
 
 Short description: An open-source download manager with native BitTorrent support and a local browser interface.
 
-Description: Manage file downloads and BitTorrent transfers from a local interface. Import torrent files and magnets, pause and resume transfers, import multiple links, inspect progress and verify completed files with SHA-256. Pair a compatible browser companion extension to send selected download links to your local manager. Native BitTorrent is built in. HTTP, HTTPS, FTP and SFTP use a separately installed aria2 engine; it is not included. The current development version uses a browser interface and does not provide a native desktop window or tray. It is an independent project and is not affiliated with Internet Download Manager, Free Download Manager or Mister Download Manager.
+Description: Manage file downloads and BitTorrent transfers from a local interface. Import torrent files and magnets, pause and resume transfers, import multiple links, inspect progress and verify completed files with SHA-256. Pair a compatible browser companion extension to send selected download links to your local manager. HTTP/HTTPS and BitTorrent are built in. Optional separately installed aria2 adds accelerated file transfers and FTP/SFTP; it is not included. The current MSIX pipeline packages the local browser interface; the native window/tray candidate is being validated separately. It is an independent project and is not affiliated with Internet Download Manager, Free Download Manager or Mister Download Manager.
 
 Support: https://github.com/abhisekp/open-download-manager/issues
 
@@ -31,7 +31,7 @@ Do not advertise full IDM/FDM/MDM parity, a complete third-party add-on platform
 
 ODM stores transfer sessions, downloaded files, torrent state and limited transfer history on the user's computer. Source URLs and paths may be retained in that local data. Browser pairing creates a local, revocable token. Keep the application data directory and launch link private.
 
-The current application includes no account service, payment service or built-in analytics. Its interface and download-control API listen on the local loopback address. Download sources, BitTorrent peers and trackers necessarily receive network requests and may observe the user's network address and requested content. Fetching the optional live tracker feed contacts newtrackon.com. A separately installed aria2 process handles supported non-torrent protocols.
+The current application includes no account service, payment service or built-in analytics. Its interface and download-control API listen on the local loopback address. Download sources, BitTorrent peers and trackers necessarily receive network requests and may observe the user's network address and requested content. Fetching the optional live tracker feed contacts newtrackon.com. A separately installed aria2 process handles its supported transfers when available; native HTTP works without it.
 
 Removing a transfer or forgetting history does not delete downloaded files. Do not include private URLs, launch links, pairing tokens or personal file paths in public issue reports. This statement describes the current development implementation; the owner must approve its public use and keep it synchronized with product changes.
 

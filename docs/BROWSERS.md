@@ -10,12 +10,14 @@ Original extension code is MIT licensed. The extension sends only a link explici
 | Microsoft Edge | Chromium Manifest V3 / Edge Add-ons | Package and contract tests only |
 | Brave, Vivaldi | Chromium package / Chrome Web Store | Not browser-tested |
 | Opera | Chromium package / Opera Add-ons, subject to review | Not browser-tested |
-| Firefox | Firefox MV3 background-script package / Mozilla Add-ons | Package and contract tests only; unsigned |
+| Firefox | Firefox MV3 background-script package / Mozilla Add-ons | Firefox 160.0.1 on Windows: installed temporary extension, real popup pairing/transfer/revocation/disconnect/uninstall passed; marketplace signing pending |
 | Safari | WebExtension conversion source / Apple distribution | Unconverted, unsigned, untested |
 
 No marketplace listing exists yet. Do not invent extension IDs or store URLs. Installed-browser verification, store artwork/metadata, privacy declarations, policy review and signing/submission remain release gates. Firefox publisher login has been verified. Edge currently redirects to Partner Center Home; access to its extension dashboard is not yet verified. Chrome registration is blocked because the owner's cards cannot pay its registration fee; keep the manual-install package available without purchases or payment changes. Apple Store publication and paid Apple membership are excluded by the owner, so Safari distribution remains unfulfilled.
 
 Firefox packages require version 142 or later and declare `browsingActivity` transmission: user-selected URLs leave the browser for the paired local application. Local-only delivery is still transmission under Mozilla's policy; `none` would be inaccurate. The extension does not upload URLs to ODM-operated servers or maintain a browsing-history database. Mozilla's `web-ext` validator must pass with warnings treated as errors before submission.
+
+See the [browser companion privacy statement](BROWSER-PRIVACY.md). The installed Firefox integration test uses a freshly created synthetic profile, a verified Mozilla browser/driver, its own temporary extension, a local fixture and a separate ODM profile. Its driver enables privileged Firefox UI access only to open that installed extension's internal popup; it never attaches to an existing personal browser or publisher session.
 
 ## Pairing and use
 
