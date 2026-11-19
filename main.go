@@ -75,12 +75,11 @@ func main() {
 			log.Fatal(e)
 		}
 	}
-	// A lock directory prevents two processes from owning the same session file.
-	lock := filepath.Join(*data, "running.lock")
-	if e := os.Mkdir(lock, 0700); e != nil {
-		log.Fatal("data directory is already in use; after a crash remove running.lock only when ODM is stopped")
+	lock, err := acquireDataLock(*data)
+	if err != nil {
+		log.Fatal(err)
 	}
-	defer os.Remove(lock)
+	defer lock.Close()
 	rpcListener, e := net.Listen("tcp4", "127.0.0.1:0")
 	if e != nil {
 		log.Fatal(e)

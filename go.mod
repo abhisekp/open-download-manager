@@ -7,6 +7,7 @@ toolchain go1.26.11
 require (
 	github.com/cenkalti/log v1.0.0
 	github.com/cenkalti/rain/v2 v2.5.1
+	github.com/gofrs/flock v0.13.2
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/zeebo/bencode v1.0.0
 )

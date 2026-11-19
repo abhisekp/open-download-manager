@@ -15,7 +15,7 @@ go build -o odm .
 ./odm
 ```
 
-Windows: build with `go build -o odm.exe .` and run `odm.exe`. It opens a browser to an authenticated loopback session. `--no-browser` prints the launch link; treat that link as a local credential and do not share it. `--engine` accepts a full aria2 executable path. `--downloads` selects the download directory. `--data-dir` selects application data. Stop with Ctrl+C to save unfinished transfers; closing the browser leaves the app running.
+Windows: build with `go build -o odm.exe .` and run `odm.exe`. It opens a browser to an authenticated loopback session. `--no-browser` prints the launch link; treat that link as a local credential and do not share it. `--engine` accepts a full aria2 executable path. `--downloads` selects the download directory. `--data-dir` selects application data. Stop with Ctrl+C to save unfinished transfers; closing the browser leaves the app running. OS-backed data locking prevents concurrent ownership and recovers after abrupt termination. Legacy releases without an ownership marker are rejected conservatively; stop the old release before clearing its legacy lock.
 
 Portable archives under `dist/` contain the application, not aria2. External engine installation is still required. Linux needs a browser and `xdg-open`, or open the printed link manually. There is no desktop shortcut/tray/native window yet.
 

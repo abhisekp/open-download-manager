@@ -67,7 +67,7 @@ jobs:
           npm ci --prefix ui --ignore-scripts
           npm run build --prefix ui
           npm run test:sites --prefix ui
-          test -z "$(gofmt -l *.go)"
+          test -z "$(git ls-files -z '*.go' | xargs -0 gofmt -l)"
           python3 -m unittest discover -s scripts -p "test_*.py"
           go mod verify
           go vet ./...
