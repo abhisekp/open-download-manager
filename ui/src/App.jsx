@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BrowserConnections } from "./BrowserConnections.jsx";
 import { AddonManager } from "./AddonManager.jsx";
+import { TorrentTrackers } from "./TorrentTrackers.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -371,6 +372,8 @@ export function App() {
                       <td>
                         <button
                           className="file"
+                          aria-label={"Select download " + name(row)}
+                          aria-pressed={d?.gid === row.gid}
                           onClick={() => setSelected(row.gid)}
                         >
                           <I
@@ -477,10 +480,11 @@ export function App() {
                 </dl>
                 {d.native && (
                   <p>
-                    Native BitTorrent � {d.torrentState} �{" "}
-                    {d.private ? "Private torrent" : "Public torrent"}
+                    Native BitTorrent · {d.torrentState} ·{" "}
+                    {d.private ? "Private torrent" : d.metadataReady ? "Public torrent" : "Waiting for metadata"}
                   </p>
                 )}
+                {d.native && <TorrentTrackers key={d.gid} gid={d.gid} api={api} suggestions={trackers} />}
                 <p className="destination">
                   <I name="folder2" /> {data.directory}
                 </p>

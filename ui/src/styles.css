@@ -605,3 +605,10 @@ textarea {
 .addon-list li { border-bottom: 1px solid #d8e1ee; padding: 1rem 0; }
 .addon-manager dt { font-weight: 600; margin-top: .6rem; }
 .addon-manager dd { margin: .3rem 0; }
+.torrent-trackers { margin: 1.25rem 0; border-top: 1px solid #d8e1ee; padding-top: 1rem; }
+.torrent-trackers summary { cursor: pointer; font-weight: 600; margin-bottom: 1rem; }
+.torrent-trackers label:not(.permission) { display: grid; gap: .4rem; margin: 1rem 0; }
+.torrent-trackers textarea { width: 100%; padding: .65rem; border: 1px solid #8c9db7; border-radius: .4rem; font: inherit; }
+.torrent-trackers .permission { display: flex; gap: .5rem; align-items: flex-start; margin: 1rem 0; }
+.torrent-trackers code { overflow-wrap: anywhere; }
+.torrent-trackers li { margin: .5rem 0; }

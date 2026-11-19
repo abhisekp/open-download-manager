@@ -30,7 +30,7 @@ Portable archives under `dist/` contain the application, not aria2. The basic HT
 - Persist a download speed limit for native HTTP and the optional aria2 engine; native torrent limits are not exposed yet. Each engine enforces its own limit rather than a shared application-wide budget.
 - Save unfinished transfer sessions every ten seconds and on graceful shutdown.
 - Pair a browser extension with a dedicated, revocable link-submission token. See [browser integration](docs/BROWSERS.md) for packages and current marketplace limitations.
-- Fetch/copy a live tracker list using the built-in, permission-gated tracker-feed capability.
+- Fetch/copy a live tracker list, then separately review and add chosen URLs to a public native torrent. Private torrents and magnets awaiting metadata cannot receive additions. Tracker removal/replacement remains open; see [native torrent controls](docs/NATIVE-TORRENTS.md).
 - Install signed local URL-resolver add-ons, review exact host permissions, enable/disable them, and review suggested links before downloading. Modules run in isolated WASI workers; see the [SDK](sdk/README.md) for the contract and remaining limits.
 - Keep downloaded files when removing a transfer. Never automatically execute downloads.
 

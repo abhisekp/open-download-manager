@@ -2,28 +2,35 @@
 
 This report covers local development evidence, not production or Store readiness. The public repository is https://github.com/abhisekp/open-download-manager. The user chose an independent implementation, MIT licensing, public source, and the final navy/cyan icon. MDM source and assets were not reused.
 
-## Passed locally on Windows x64
+## Recorded CI checkpoints
 
-- Go unit/integration tests and race detection, including API token/Host/Origin boundaries, RPC errors, extension endpoint restrictions, tracker parsing, browser-token isolation/revocation, persistent history, checksum mismatch and path confinement.
-- Real HTTP fixture transfers: add, pause, resume, byte-for-byte SHA-256 integrity, duplicate removal for batch input, local browser-bridge submission/revocation and aria2 bandwidth limits.
-- Restart tests: paused transfers and completed history recover; archived checksum checks and forgetting history work; lock and temporary engine credential files are cleaned on graceful exit.
-- Native Rain BitTorrent transfer between two loopback peers: magnet metadata exchange, verified piece transfer, exact downloaded bytes, native database recovery and unsafe metadata rejection. No public swarm was contacted.
-- Native-only application startup/import with a deliberately missing aria2 executable. Other protocols report the missing optional engine.
-- Official Go vulnerability scanner v1.10.0: no vulnerabilities found for the scanned source. npm audit after compatible build-tool fixes: zero reported vulnerabilities.
-- UI production build, four bundled worker/packaging tests, and three WebExtension connection contract tests.
-- Browser UI: real transfer display, validation feedback, live tracker retrieval (75 entries at the time), permission controls, custom checksum dialog with a successful match, and custom remove confirmation. Removal retains files.
-- Dependency license texts collected from actual Go build modules; the old unlicensed helper was replaced with original MIT compatibility code and tested separately.
+| Scope | Exact signed source | Passing run |
+|---|---|---|
+| Core race/integration checks, nine portable targets, Debian installation and native platform tests | `e059994` | [Verify and build](https://github.com/abhisekp/open-download-manager/actions/runs/44478683534) |
+| Actual packaged desktop runtime, UI, real transfer and clean quit on Windows/Linux/macOS x64/ARM64 | `e059994` | [Native desktop candidates](https://github.com/abhisekp/open-download-manager/actions/runs/44478683558) |
+| Installed Firefox companion: pairing, real transfer bytes, revocation, disconnect and uninstall | `e059994` | [Installed browser companion](https://github.com/abhisekp/open-download-manager/actions/runs/44478683749) |
+| Portable release validation, complete packages, official CycloneDX schema, provenance and inventory | `39cbf86b1a482a50f7e6a019cbd2d0270028c7c9` | [Validation only](https://github.com/abhisekp/open-download-manager/actions/runs/44477177969) |
+| Three development MSIX packages, Windows x86 runtime and x64 install/launch/upgrade/uninstall | `39cbf86b1a482a50f7e6a019cbd2d0270028c7c9` | [MSIX validation only](https://github.com/abhisekp/open-download-manager/actions/runs/44477173324) |
 
-## Packaging and remote boundaries
+The experimental `v0.1.0-dev` release at signed source `979322938604eeafda854eafb944a27a01027b65` is public. [Its gated publication run](https://github.com/abhisekp/open-download-manager/actions/runs/44455684894) passed both owner reviews. Public packages were downloaded and checked with the verifier from that tag. Later source features are not in those published binaries. Changing development VERSION to `0.2.0-dev` does not publish another release.
 
-Windows x86/x64/ARM64 and Linux x86/x64/ARMv7/ARM64 build recipes are provided, together with ZIP, tar.gz, Debian and WebExtension packaging. Cross-compilation and archive/PE/ELF inspection do not establish runtime compatibility on the other CPUs. All seven native-engine targets cross-compiled locally. Windows x86/x64/ARM64 PE headers, Linux ELF headers, archives and checksums are inspected separately; authoritative CI results belong to the matching Git commit.
+## Local and integration evidence
 
-The Chromium/Firefox packages are development artifacts. Installed-browser tests, marketplace review/signing/publication and Safari conversion remain pending. Browser cookies are not forwarded and automatic interception is not implemented. No marketplace URLs or IDs are fabricated.
+- Native HTTP without aria2: real fixture transfers, pause/resume and matching bytes; validator/resource-change/range/TLS/redirect/stall checks, crash checkpoints, interrupted finalization, safe collisions and persisted speed limits. Optional-engine and corrupt add-on/torrent components do not have to hide a working native HTTP engine.
+- Native Rain BitTorrent: two loopback peers, magnet metadata exchange, verified pieces and exact file bytes, paused/completed state normalization and database recovery. No public swarm was contacted.
+- API capability boundaries: UI bearer/Host/Origin checks, browser-token isolation and revocation, bounded batch/history/checksum operations and storage path boundaries.
+- Signed installable WASI resolvers: exact package/signature/module/license verification, disabled-by-default permission review, publisher continuity, update revocation, restart persistence, worker time/memory/output bounds, and filesystem/network/environment denial. The actual package-to-API-to-reviewed-link-to-real-download flow passes. Go's worker memory target is not an OS RSS ceiling.
+- Native desktop: source and packaged code plus actual renamed runtime launches; isolated renderer, real local transfer, hide/show, saved state and clean exit. Linux package paths avoid the confirmed upstream Chromium setuid-launcher space bug. Windows/macOS publisher signing and macOS notarization are not implied.
+- Firefox 160.0.1/geckodriver 0.37.1 on Windows: exact companion 0.2.0 package `9e2a9de6432bda52735154b4a859dc2322dffc8db88c0feb841e441c6a950d06` temporarily installed and tested against both development ODM and downloaded/checksum-verified public ODM 0.1.0-dev with aria2. Mozilla validated it with zero errors/warnings. The owner approved the public submission, and Mozilla confirmed version receipt; signing/publication remain unverified until read back. The supplied source reproduced all 11 shipped file bytes on Windows and Linux.
+- Public tracker additions: local race tests cover permission refusal, private/unknown-metadata protection, whole-input validation, duplicate/concurrent edits, unchanged info hashes, a real local tracker and restart persistence. A simulated storage failure verifies honest partial-result reporting. Actual Chrome UI tests cover review gating, approval clearing after URL edits, successful additions, and private/unknown-metadata read-only behavior. The external feed was mocked for the separate feed-to-review-to-real-addition flow. These new tracker changes require their own post-push CI outcome; the older CI links above do not attest them.
+- Go tests/race/vet and official govulncheck v1.10.0 passed for the tracker source locally; no vulnerabilities were reported. UI build/Sites checks, WebExtension contracts and package-version tests passed. Dependency scan results are point-in-time evidence, not a guarantee of complete security.
 
-Windows SDK makeappx 10.0.26100.9457 validated x86/x64/ARM64 packages using an explicit development identity. The preparation workflow accepts the real reserved identity as input. Packages are unsigned review artifacts, not certified Store releases. Store identity, install/update/uninstall tests, optional HTTP-engine bundling, signing/certification and submission remain pending. Store submission is not automated in this milestone.
+## Distribution and remaining acceptance
 
-Public repository creation was verified through the browser and GitHub connector. Mockend access was explicitly approved after automatic review blocked the initial creation attempt. Source commits require actual signature verification; see Git history and the remote workflow run for the published checkpoint. No tag or public binary release is automatically created by a source push.
+Nine portable Go targets are built: Windows x86/x64/ARM64, Linux x86/x64/ARMv7/ARM64 and both Macs. Six x64/ARM64 native desktop targets are separate development candidates; current Electron does not provide the three 32-bit runtime variants. Their portable browser-interface builds remain available. Archive checks are distinct from native execution, emulation, installation and certification.
 
-## Open product work
+The native desktop candidates are not yet integrated into the portable/MSIX publication contract. Their runtime inventory/provenance, native installers, upgrades and clean uninstall remain release work. MSIX installation uses a disposable test certificate only on a hosted runner; no test trust root is installed on the owner's computer. Store identity/certification/submission remain unresolved. Apple Store publication and paid Apple Developer membership are excluded by the owner; direct macOS signing/notarization limitations remain explicit.
 
-This is an early browser-based local app, not a complete FDM/MDM replacement or a native desktop window. Scheduling, queue reordering, complete durable preferences, browser credential handoff, third-party installable add-ons, media/gallery adapters, native torrent file priorities/seeding controls, remote MCP, and full release certification remain on the roadmap. A passing test suite does not establish untested features.
+Chrome registration is payment-blocked. Edge publisher content has not rendered successfully. Firefox is submitted, not yet verified publicly installable. Safari is conversion source only. Native messaging, installer-assisted marketplace handoff, automatic interception and browser credential handoff remain open.
+
+ODM is not complete IDM/FDM/MDM parity or production-ready. Native segmentation/authenticated credentials, scheduling/queue organization, richer extension APIs/updates and hard worker memory limits, torrent selection/priorities/seeding/limits, media providers and full distribution remain on [the roadmap](ROADMAP.md). No source push creates a release automatically, and no passing test establishes an unimplemented feature.
