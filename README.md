@@ -31,6 +31,7 @@ Portable archives under `dist/` contain the application, not aria2. External eng
 - Save unfinished transfer sessions every ten seconds and on graceful shutdown.
 - Pair a browser extension with a dedicated, revocable link-submission token. See [browser integration](docs/BROWSERS.md) for packages and current marketplace limitations.
 - Fetch/copy a live tracker list using the built-in, permission-gated tracker-feed capability.
+- Install signed local URL-resolver add-ons, review exact host permissions, enable/disable them, and review suggested links before downloading. Modules run in isolated WASI workers; see the [SDK](sdk/README.md) for the contract and remaining limits.
 - Keep downloaded files when removing a transfer. Never automatically execute downloads.
 
 HTTP and native BitTorrent transfers have local end-to-end evidence. FTP, SFTP, public swarm downloads and external authenticated servers have not been integration-tested. Completed history is stored locally in a bounded JSON file and survives graceful restart. An interrupted write preserves the prior file; a crash before the five-second history snapshot can lose the newest terminal entries. Forgetting history does not delete downloaded files. Sessions store source URLs; keep application data private. DHT/PEX are disabled and seeding stops on completion. Native torrent peer connections can use the network; no firewall rule is installed automatically. Private torrent metadata must never be rewritten to bypass tracker restrictions.

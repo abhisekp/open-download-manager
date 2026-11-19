@@ -596,3 +596,12 @@ textarea {
     font-size: 11px;
   }
 }
+.addon-manager { margin-bottom: 2rem; }
+.addon-manager label:not(.permission) { display: grid; gap: .4rem; margin: 1rem 0; }
+.addon-manager input[type="url"], .addon-manager select { width: 100%; padding: .65rem; border: 1px solid #8c9db7; border-radius: .4rem; background: #fff; color: #15273f; }
+.addon-review { border: 1px solid #8c9db7; border-radius: .6rem; padding: 1rem; margin: 1rem 0; }
+.addon-manager code { overflow-wrap: anywhere; }
+.addon-list { padding: 0; list-style: none; }
+.addon-list li { border-bottom: 1px solid #d8e1ee; padding: 1rem 0; }
+.addon-manager dt { font-weight: 600; margin-top: .6rem; }
+.addon-manager dd { margin: .3rem 0; }

@@ -1,0 +1,11 @@
+{
+  "api": 1,
+  "id": "org.odm.clean-link",
+  "name": "Clean download link",
+  "version": "1.0.0",
+  "description": "Remove campaign parameters and fragments from example.com links. No files or network are available to this module.",
+  "capability": "url-resolver",
+  "input_hosts": ["example.com"],
+  "output_hosts": ["example.com"],
+  "module_sha256": ""
+}

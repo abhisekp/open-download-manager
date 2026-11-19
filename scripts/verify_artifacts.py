@@ -44,7 +44,8 @@ def verify(dist, kind):
     expected = []
     if kind == 'portable':
         for system, arches, suffix in [('windows', ['386', 'amd64', 'arm64'], '.zip'),
-                                        ('linux', ['386', 'amd64', 'arm', 'arm64'], '.tar.gz')]:
+                                        ('linux', ['386', 'amd64', 'arm', 'arm64'], '.tar.gz'),
+                                        ('darwin', ['amd64', 'arm64'], '.tar.gz')]:
             for arch in arches:
                 name = f'odm-0.1.0-dev-{system}-{arch}{suffix}'
                 expected.append(name)

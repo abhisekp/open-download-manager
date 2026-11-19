@@ -1,11 +1,26 @@
-# Extension API v1 (development)
+# Application extensions
 
-The product target is a first-class application extension platform, described in [PRODUCT-BRIEF.md](PRODUCT-BRIEF.md). It is separate from browser companion extensions. The implementation below is only the current built-in capability and does not satisfy the full add-on requirement. SDK/API design and execution isolation are early architecture milestones, rather than work deferred until every advanced integration is hard-coded.
+ODM now supports locally installed, signed WASI `url-resolver` packages. The Extensions page provides exact-package permission review, installation, enable/disable, uninstall and explicit resolution-to-download handoff. Registry/grants persist locally; updates require review and revoke the prior grant. Publisher-key changes cannot replace an installed ID.
 
-The current executable registers one declarative manifest in `extensions.go`. It has ID, name, version, capability, endpoint and description. The only capability is `tracker-feed`; the only approved endpoint is `https://newtrackon.com/api/live`. Host code performs HTTPS access with a timeout, rejects redirects, bounds the feed to 256 KiB / 500 unique entries, and validates protocols.
+Each invocation runs in a separate worker process, using a WASM interpreter with no mounted files, inherited environment, network sockets or subprocess imports. The host enforces declared input/output hosts, integrity checks, output/memory limits and deadlines. See [SDK contract, build examples, limits and verification](../sdk/README.md).
 
-The permission checkbox is per page session. The host API also requires an explicit enabled grant on each fetch. It does not grant arbitrary domains, filesystem access, scripts, subprocesses or generic RPC. Revocation disables subsequent requests; it does not cancel a request already in flight.
+This is a concrete first platform milestone, not the complete product brief's extension ecosystem. Network-capable provider adapters, credential storage, event/UI contributions, automatic update distribution, OS-enforced worker RSS limits and broader independent hardening remain outstanding. The core download UI remains a local browser application; this feature does not supply the missing native shell.
 
-This is an extension foundation, not an installable ecosystem. Third-party loading, a marketplace, package signing, persisted grants, extension disable/upgrade lifecycle and public SDK are not implemented. Do not load downloaded scripts into the application process as a shortcut.
+## Authenticated host API
 
-Future manifests should declare scoped operations such as URL resolution, tracker feeds, metadata enrichment or completion notifications. Host APIs must enforce these capabilities, restrict destinations, bound responses and time, redact credentials, and isolate code execution. Unknown permissions require explicit user approval; install/update cannot silently widen grants.
+All routes use the existing local UI bearer token and Host/Origin guard. Browser pairing tokens cannot call these routes.
+
+| Route | Operation |
+|---|---|
+| GET `/api/addons` | List installed signed manifests and grants |
+| POST `/api/addons/inspect` | Inspect a raw .odmx file without installing it |
+| POST `/api/addons/install` | Install the reviewed file; requires `X-ODM-Approve-SHA256` matching its digest |
+| POST `/api/addons/enable` | Persist `{id, enabled}` |
+| POST `/api/addons/uninstall` | Revoke and remove `{id}` |
+| POST `/api/addons/resolve` | Run `{id, url}` and return approved-host URL suggestions; never automatically starts a transfer |
+
+No generic RPC, command execution or remote add-on installation endpoint is exposed.
+
+## Built-in tracker feed
+
+The existing newTrackon feed is separate. It fetches `https://newtrackon.com/api/live` only after the page-session checkbox grant. HTTPS requests are timed out, redirects are rejected and responses are limited to 256 KiB / 500 validated unique tracker entries. Fetching never changes torrent trackers. Private torrent metadata must not be rewritten to bypass tracker restrictions.

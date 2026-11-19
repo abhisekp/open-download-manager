@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/abhisekp/open-download-manager/internal/addons"
 )
 
 //go:embed ui/dist/client
@@ -42,7 +44,14 @@ func main() {
 	enginePath := flag.String("engine", "aria2c", "path to aria2c")
 	noBrowser := flag.Bool("no-browser", false, "do not open a browser")
 	showVersion := flag.Bool("version", false, "print version")
+	addonWorker := flag.Bool("addon-worker", false, "run the isolated add-on worker")
 	flag.Parse()
+	if *addonWorker {
+		if addons.Worker(os.Stdin, os.Stdout, os.Stderr) != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if *showVersion {
 		fmt.Println(version)
 		return
@@ -131,6 +140,10 @@ func main() {
 		return
 	}
 	app := &App{engine: engine, token: auth, host: listener.Addr().String(), downloads: *downloads, history: history, verifyGate: make(chan struct{}, 1)}
+	app.addons, err = addons.Open(filepath.Join(*data, "addons"))
+	if err != nil {
+		log.Print("Add-on registry unavailable; ordinary downloads remain available")
+	}
 	app.bridge = &Bridge{}
 	srv := &http.Server{Handler: app.handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -198,10 +211,13 @@ type App struct {
 	history                *History
 	verifyGate             chan struct{}
 	bridge                 *Bridge
+	addons                 *addons.Store
 }
 
 func (a *App) handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/addons", a.addonsAPI)
+	mux.HandleFunc("/api/addons/", a.addonsAPI)
 	mux.HandleFunc("/api/", a.api)
 	mux.HandleFunc("/bridge/", a.bridgeAPI)
 	files, _ := fs.Sub(assets, "ui/dist/client")

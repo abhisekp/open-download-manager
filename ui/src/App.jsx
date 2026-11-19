@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BrowserConnections } from "./BrowserConnections.jsx";
+import { AddonManager } from "./AddonManager.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -488,6 +489,7 @@ export function App() {
         )}
         {view === "Extensions" && (
           <section className="settings">
+            <AddonManager api={api} token={token} onAdded={refresh} />
             <div className="extension-heading">
               <I name="puzzle" />
               <div>
@@ -560,9 +562,10 @@ export function App() {
             <div className="boundary">
               <h3>Extension API v1</h3>
               <p>
-                Extensions use host-defined capabilities. Arbitrary scripts,
-                shell execution and third-party installation are not enabled in
-                this version.
+                Signed local URL resolvers run in an isolated worker with
+                reviewed host permissions. The built-in tracker feed has a
+                separate network grant. Shell commands and unrestricted scripts
+                are not supported.
               </p>
             </div>
           </section>

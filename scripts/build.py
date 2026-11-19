@@ -1,7 +1,7 @@
 """Build portable archives. Does not fetch or redistribute aria2."""
 import hashlib,json,os,pathlib,subprocess,tarfile,zipfile
 root=pathlib.Path(__file__).resolve().parents[1];out=root/'dist';out.mkdir(exist_ok=True)
-targets=[('windows','386'),('windows','amd64'),('windows','arm64'),('linux','386'),('linux','amd64'),('linux','arm'),('linux','arm64')]
+targets=[('windows','386'),('windows','amd64'),('windows','arm64'),('linux','386'),('linux','amd64'),('linux','arm'),('linux','arm64'),('darwin','amd64'),('darwin','arm64')]
 for system,arch in targets:
     stem=f'odm-0.1.0-dev-{system}-{arch}';folder=out/stem;folder.mkdir(exist_ok=True)
     name='odm.exe' if system=='windows' else 'odm';env={**os.environ,'GOOS':system,'GOARCH':arch,'CGO_ENABLED':'0','GOARM':'7'}

@@ -61,6 +61,7 @@ jobs:
           python3 scripts/smoke.py --exe /tmp/odm
           python3 scripts/recovery_test.py --exe /tmp/odm --root /tmp/odm-recovery
           python3 scripts/native_mode_test.py --exe /tmp/odm
+          python3 scripts/addons_test.py --exe /tmp/odm
       - name: Install, launch and uninstall Debian package
         run: bash scripts/linux_install_test.sh
       - name: Exercise Linux x86 and emulated ARMv7 binaries
@@ -68,7 +69,8 @@ jobs:
           python3 scripts/native_mode_test.py --exe dist/odm-0.1.0-dev-linux-386/odm
           printf '#!/usr/bin/env bash\nexec qemu-arm "%s/dist/odm-0.1.0-dev-linux-arm/odm" "$@"\n' "$GITHUB_WORKSPACE" > /tmp/odm-arm-test
           chmod +x /tmp/odm-arm-test
-          python3 scripts/native_mode_test.py --exe /tmp/odm-arm-test
+          python3 scripts/native_mode_test.py --exe /tmp/odm
+          python3 scripts/addons_test.py --exe /tmp/odm-arm-test
       - name: Validate Debian metadata
         run: |
           for package in dist/*.deb; do dpkg-deb --info "$package"; done
@@ -88,7 +90,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04-arm, windows-11-arm]
+        os: [ubuntu-24.04-arm, windows-11-arm, macos-15, macos-15-intel]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     defaults:
@@ -106,7 +108,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Build UI and run native ARM64 torrent tests
+      - name: Build UI and run native platform and add-on tests
         run: |
           npm ci --prefix ui --ignore-scripts
           npm run build --prefix ui

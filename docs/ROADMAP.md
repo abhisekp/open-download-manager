@@ -16,7 +16,7 @@ The target is an independent IDM/FDM/MDM-style desktop download manager with a f
 | Browser integration | Paired link-submission bridge, Chromium/Firefox packages, Safari conversion source | Actual browser tests, marketplace signing/publication and installer-assisted store handoff |
 | Native desktop | Not implemented | Native shell, tray, accessibility, single instance, shutdown UX |
 | Media extraction | Not implemented | Explicit provider adapters, rights review, safe dependency management |
-| Extensions | One built-in tracker-feed capability | First-class SDK and versioned host API, isolated execution, package installation/lifecycle, capability enforcement, UI/events, signing, upgrades and compatibility tests |
+| Extensions | Signed local WASI URL-resolver packages, SDK, isolated workers, permission review, lifecycle and real transfer integration | OS-enforced worker RSS limits, network provider APIs, events/UI contributions, automatic updates and independent hardening |
 | Tracker management | Feed fetch/copy only | Per-torrent changes after private flag checks; rollback and permission audit |
 | Site explorer, previews, conversion | Not implemented | Separate scoped milestones |
 | Remote MCP | Design only | User-bound API keys, hosted TLS, isolation and real client tests |

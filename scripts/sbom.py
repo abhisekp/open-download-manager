@@ -29,7 +29,7 @@ def generate(dist):
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     modules = {}
     for system, arch in [('windows', '386'), ('windows', 'amd64'), ('windows', 'arm64'),
-                         ('linux', '386'), ('linux', 'amd64'), ('linux', 'arm'), ('linux', 'arm64')]:
+                         ('linux', '386'), ('linux', 'amd64'), ('linux', 'arm'), ('linux', 'arm64'), ('darwin', 'amd64'), ('darwin', 'arm64')]:
         env = {**os.environ, 'GOOS': system, 'GOARCH': arch, 'CGO_ENABLED': '0', 'GOARM': '7'}
         output = subprocess.check_output(['go', 'list', '-deps', '-json', '.'], cwd=ROOT,
                                          env=env, text=True, encoding='utf-8')
@@ -106,7 +106,7 @@ def generate(dist):
                                       'licenses': [{'license': {'id': 'MIT'}}]},
                         'properties': [{'name': 'odm:source-commit', 'value': revision},
                                        {'name': 'odm:external-engine-bundled', 'value': 'false'},
-                                       {'name': 'odm:inventory-scope', 'value': 'Resolved Go dependencies across seven targets, production npm lockfile components, Go standard library and package hashes; excludes build-only npm tools and external aria2.'}]},
+                                       {'name': 'odm:inventory-scope', 'value': 'Resolved Go dependencies across nine targets, production npm lockfile components, Go standard library and package hashes; excludes build-only npm tools and external aria2.'}]},
            'components': components,
            'dependencies': [{'ref': root_ref, 'dependsOn': [c['bom-ref'] for c in components]}]}
     path = dist / 'odm.cdx.json'
