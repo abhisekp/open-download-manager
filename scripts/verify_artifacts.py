@@ -1,10 +1,37 @@
 """Fail closed on incomplete packages, wrong architectures or corrupt checksums."""
 import argparse
 import hashlib
+import io
 import pathlib
 import tarfile
 import xml.etree.ElementTree as ET
 import zipfile
+
+
+def verify_deb(path, arch):
+    body = path.read_bytes()
+    if not body.startswith(b'!<arch>\n'):
+        raise ValueError('Invalid Debian container')
+    members = {}
+    offset = 8
+    while offset < len(body):
+        header = body[offset:offset + 60]
+        if len(header) != 60 or header[-2:] != b'`\n':
+            raise ValueError('Invalid Debian member header')
+        size = int(header[48:58])
+        name = header[:16].decode().strip().rstrip('/')
+        members[name] = body[offset + 60:offset + 60 + size]
+        offset += 60 + size + size % 2
+    if members.get('debian-binary') != b'2.0\n':
+        raise ValueError('Unsupported Debian format')
+    with tarfile.open(fileobj=io.BytesIO(members['control.tar.gz'])) as archive:
+        control = archive.extractfile('control').read().decode()
+        if f'Architecture: {arch}\n' not in control:
+            raise ValueError('Wrong Debian architecture')
+    with tarfile.open(fileobj=io.BytesIO(members['data.tar.gz'])) as archive:
+        archive.getmember('usr/bin/odm')
+        for name in ['copyright', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt']:
+            archive.getmember('usr/share/doc/open-download-manager/' + name)
 
 
 def verify(dist, kind):
@@ -34,6 +61,8 @@ def verify(dist, kind):
                     if not any(member.endswith('/' + required) for member in members):
                         raise ValueError(f'{name} missing {required}')
         expected += [f'open-download-manager_0.1.0-dev_{arch}.deb' for arch in ['i386', 'amd64', 'armhf', 'arm64']]
+        for arch in ['i386', 'amd64', 'armhf', 'arm64']:
+            verify_deb(dist / f'open-download-manager_0.1.0-dev_{arch}.deb', arch)
         expected += [f'odm-extension-{browser}-0.1.0.zip' for browser in ['chromium', 'firefox', 'safari-source']]
     else:
         for arch in ['x86', 'x64', 'arm64']:
