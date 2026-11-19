@@ -1,0 +1,18 @@
+{
+  "name": "open-download-manager-desktop",
+  "version": "0.1.0-dev",
+  "private": true,
+  "description": "Native desktop window for Open Download Manager",
+  "author": "Open Download Manager contributors",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test policy.test.cjs",
+    "smoke": "electron smoke.cjs"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "45.4.1"
+  }
+}

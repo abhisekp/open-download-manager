@@ -79,6 +79,7 @@ jobs:
           python3 scripts/linux_packages.py
           node --test browser-extension/test.cjs
           python3 scripts/extensions.py
+          npx --yes web-ext@10.8.0 lint --source-dir dist/extension-firefox --warnings-as-errors
           python3 scripts/checksums.py
           python3 scripts/verify_artifacts.py --kind portable
           for package in dist/*.deb; do dpkg-deb --info "$package"; done

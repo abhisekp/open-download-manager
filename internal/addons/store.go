@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/abhisekp/open-download-manager/internal/processutil"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -256,6 +257,7 @@ func (s *Store) Resolve(ctx context.Context, id, input string) ([]string, error)
 	}
 	stdout, stderr := &limitedOutput{}, &limitedOutput{}
 	command := exec.CommandContext(ctx, executable, "--addon-worker")
+	processutil.Background(command)
 	command.Stdin = bytes.NewReader(body)
 	command.Stdout = stdout
 	command.Stderr = stderr

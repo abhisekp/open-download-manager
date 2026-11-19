@@ -7,7 +7,7 @@ for browser in ['chromium','firefox','safari-source']:
     manifest={'manifest_version':3,'name':'Open Download Manager','version':'0.1.0','description':'Send selected download links to your paired local Open Download Manager.','permissions':['activeTab','storage','contextMenus'],'host_permissions':['http://127.0.0.1/*'],'action':{'default_popup':'popup.html'},'background':{'service_worker':'background.js'}}
     if browser=='firefox':
         manifest['background']={'scripts':['connection.js','background.js']}
-        manifest['browser_specific_settings']={'gecko':{'id':'odm-browser@open-download-manager.local','strict_min_version':'121.0','data_collection_permissions':{'required':['none']}}}
+        manifest['browser_specific_settings']={'gecko':{'id':'odm-browser@open-download-manager.local','strict_min_version':'142.0','data_collection_permissions':{'required':['browsingActivity']}}}
         (folder/'background.js').write_text((folder/'background.js').read_text().replace("importScripts('connection.js');",''))
     shutil.copytree(root/'browser-extension/assets',folder/'icons',dirs_exist_ok=True)
     manifest['icons']={str(size):f'icons/icon-{size}.png' for size in [16,32,48,128]}

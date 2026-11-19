@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/abhisekp/open-download-manager/internal/addons"
+	"github.com/abhisekp/open-download-manager/internal/processutil"
 	"github.com/abhisekp/open-download-manager/internal/transfers"
 )
 
@@ -121,6 +122,7 @@ func main() {
 		storedLimit = direct.Limit()
 	}
 	cmd := exec.Command(*enginePath, "--conf-path="+cfg, "--console-log-level=error", "--summary-interval=0", "--max-overall-download-limit="+strconv.FormatUint(storedLimit, 10))
+	processutil.Background(cmd)
 	if err = cmd.Start(); err != nil {
 		log.Print("Optional aria2 engine is unavailable; FTP/SFTP require it. Settings reports built-in engine availability.")
 	} else {

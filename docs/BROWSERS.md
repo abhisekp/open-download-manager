@@ -13,7 +13,9 @@ Original extension code is MIT licensed. The extension sends only a link explici
 | Firefox | Firefox MV3 background-script package / Mozilla Add-ons | Package and contract tests only; unsigned |
 | Safari | WebExtension conversion source / Apple distribution | Unconverted, unsigned, untested |
 
-No marketplace listing exists yet. Do not invent extension IDs or store URLs. Installed-browser verification, store artwork/metadata, privacy declarations, policy review, developer accounts and signing/submission remain release gates.
+No marketplace listing exists yet. Do not invent extension IDs or store URLs. Installed-browser verification, store artwork/metadata, privacy declarations, policy review and signing/submission remain release gates. Firefox publisher login has been verified. Edge currently redirects to Partner Center Home; access to its extension dashboard is not yet verified. Chrome registration is blocked because the owner's cards cannot pay its registration fee; keep the manual-install package available without purchases or payment changes. Apple Store publication and paid Apple membership are excluded by the owner, so Safari distribution remains unfulfilled.
+
+Firefox packages require version 142 or later and declare `browsingActivity` transmission: user-selected URLs leave the browser for the paired local application. Local-only delivery is still transmission under Mozilla's policy; `none` would be inaccurate. The extension does not upload URLs to ODM-operated servers or maintain a browsing-history database. Mozilla's `web-ext` validator must pass with warnings treated as errors before submission.
 
 ## Pairing and use
 
@@ -30,13 +32,14 @@ The token is stored in the browser's local extension storage, never sync storage
 
 For consumer Chrome on Windows/macOS, silent arbitrary extension installation is not an ordinary supported distribution path. ODM must not change enterprise policies or weaken browser security to force an install. Once approved listings exist, a native installer may offer an explicit **Open extension marketplace** step for the detected browser. The browser/store still owns the installation confirmation. No installer or forced-extension-install registry keys are provided in this milestone.
 
-Safari can be converted with Apple's tooling or its current App Store Connect packaging route; developer-program access, signing and real Safari testing remain required. A ZIP of source is not a signed Safari extension.
+Safari source can be converted with Apple's tooling, but conversion, real Safari testing and a supported signed distribution route are not implemented. Apple Store publication and paid Apple enrollment are excluded by the owner. A ZIP of source is not an installable Safari extension.
 
 ## Build/test
 
 ```sh
 node --test browser-extension/test.cjs
 python scripts/extensions.py
+npx --yes web-ext@10.8.0 lint --source-dir dist/extension-firefox --warnings-as-errors
 ```
 
 A future protected marketplace workflow should upload reviewed immutable extension packages using least-privilege store credentials entered outside source control. Each browser's publication, permission changes and review outcomes must be independently verified. The current GitHub workflows build artifacts only and do not submit to stores.

@@ -2,7 +2,7 @@
 
 ODM targets an independent, MIT-licensed desktop download manager combining IDM, FDM and MDM-style functionality with a first-class extension/add-on platform. See the [product brief](docs/PRODUCT-BRIEF.md).
 
-The current build is an early implementation with a local browser interface based on the selected light/blue design. **Combined feature parity, the full extension platform and a native desktop shell remain incomplete.**
+The current build is an early implementation based on the selected light/blue design. The portable service opens a local browser interface; a [native desktop window](docs/DESKTOP.md) is being validated separately. **Combined feature parity, the full extension platform and production distribution remain incomplete.**
 
 ## Run
 
@@ -27,7 +27,7 @@ Portable archives under `dist/` contain the application, not aria2. The basic HT
 - Import up to 50 newline-separated links with duplicate removal and per-link results.
 - Verify the first file of a completed transfer against an expected SHA-256 checksum (up to 1 GiB).
 - Preserve up to 500 terminal transfer records locally across graceful restarts.
-- Apply an aria2 download speed limit for non-torrent transfers in the running session; native torrent limits are not exposed yet.
+- Persist a download speed limit for native HTTP and the optional aria2 engine; native torrent limits are not exposed yet. Each engine enforces its own limit rather than a shared application-wide budget.
 - Save unfinished transfer sessions every ten seconds and on graceful shutdown.
 - Pair a browser extension with a dedicated, revocable link-submission token. See [browser integration](docs/BROWSERS.md) for packages and current marketplace limitations.
 - Fetch/copy a live tracker list using the built-in, permission-gated tracker-feed capability.
