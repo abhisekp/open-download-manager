@@ -1,6 +1,8 @@
 # Open Download Manager
 
-An early open-source download manager with a local browser interface based on the selected light/blue design. **This is a working first milestone, not full Free Download Manager parity or a native desktop application.**
+ODM targets an independent, MIT-licensed desktop download manager combining IDM, FDM and MDM-style functionality with a first-class extension/add-on platform. See the [product brief](docs/PRODUCT-BRIEF.md).
+
+The current build is an early implementation with a local browser interface based on the selected light/blue design. **Combined feature parity, the full extension platform and a native desktop shell remain incomplete.**
 
 ## Run
 

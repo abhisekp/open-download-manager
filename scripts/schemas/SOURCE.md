@@ -1,0 +1,1 @@
+CycloneDX 1.6 JSON schemas, Apache-2.0. Source: https://github.com/CycloneDX/specification/tree/6470e34ef83f915868ece48934cff52e10c9eb49/schema . Only validation tooling uses these schemas; they are not bundled with ODM.

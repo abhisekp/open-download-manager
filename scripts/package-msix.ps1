@@ -2,7 +2,8 @@ param(
   [ValidateSet('x86','x64','arm64')][string]$Architecture='x64',
   [Parameter(Mandatory=$true)][ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{2,49}$')][string]$IdentityName,
   [Parameter(Mandatory=$true)][string]$Publisher,
-  [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$PackageVersion='0.1.0.0'
+  [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$PackageVersion='0.1.0.0',
+  [string]$OutputDirectory=''
 )
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -31,7 +32,9 @@ $manifest=@"
 $sdkRoot=Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/bin'
 $makeappx=Get-ChildItem -Path (Join-Path $sdkRoot '*/x64/makeappx.exe') | Sort-Object FullName -Descending | Select-Object -First 1
 if (!$makeappx) {throw 'Windows SDK makeappx.exe is required.'}
-$output=Join-Path $projectRoot "dist/odm-$PackageVersion-$Architecture-unsigned.msix"
+if (!$OutputDirectory) {$OutputDirectory=Join-Path $projectRoot 'dist'}
+New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+$output=Join-Path $OutputDirectory "odm-$PackageVersion-$Architecture-unsigned.msix"
 & $makeappx.FullName pack /d $stage /p $output /o
 if ($LASTEXITCODE) {throw 'MSIX validation/packaging failed.'}
 Write-Output "Created unsigned package: $output"

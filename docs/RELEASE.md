@@ -29,6 +29,14 @@ Both protected environments require reviewer `abhisekp` and allow the initiating
 
 ## Remaining release work
 
-No workflow currently publishes a public binary release or submits to Microsoft Store. Store identity/account access, certification, signing and clean install/update/uninstall tests remain necessary. No SBOM or provenance attestation is generated. Windows x64 and Linux x64 have engine test evidence; cross-compilation alone does not verify the other architectures. ZIP, tar.gz, Debian and unsigned MSIX formats are implemented; RPM, AppImage, Flatpak and Snap remain planned.
+No workflow currently publishes a public binary release or submits to Microsoft Store. Store identity/account access, certification, signing and clean install/update/uninstall tests remain necessary. Release candidates now generate a CycloneDX 1.6 dependency/artifact inventory, validate it against pinned official schemas, and generate GitHub/Sigstore provenance and SBOM attestations. These records are not executable Authenticode signatures. Windows x64 and Linux x64 have engine test evidence; cross-compilation alone does not verify the other architectures. ZIP, tar.gz, Debian and unsigned MSIX formats are implemented; RPM, AppImage, Flatpak and Snap remain planned.
 
 Keep secrets out of source and chat. Retain previous packages for a reviewed manual reinstall if necessary; no automatic rollback or credential rotation is performed.
+
+## Additional release gates
+
+CI now includes native ARM64 Windows/Linux tests, Linux x86 startup, emulated Linux ARMv7 startup, and Debian x64 install/transfer/reinstall/uninstall checks. Store validation includes Windows x86 startup and an x64 MSIX install/launch/version-upgrade/uninstall test on an isolated GitHub runner. Its ephemeral test certificate is trusted only within the disposable runner; it is never a release signing identity and signed test copies are not uploaded. Configuring these checks does not establish that they pass; inspect the current run results.
+
+Release attestations require the checked-out source to equal the workflow dispatch SHA. Select the intended branch/tag as the workflow ref; draft creation should be dispatched on the reviewed tag. The source_ref input must resolve to the same SHA. Provenance verification enforces repository/workflow identity, artifact digest and exact source revision.
+
+Microsoft signs MSIX packages submitted through the Store after certification. A separately purchased signing certificate is not required for that route. Independently distributed Windows executables/MSIX have separate signing requirements. Partner Center account/name reservation, listing and app identity are still required. Source: https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options .

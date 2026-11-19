@@ -60,6 +60,16 @@ jobs:
           if ($LASTEXITCODE) {throw 'Checksums failed'}
           python scripts/verify_artifacts.py --kind msix
           if ($LASTEXITCODE) {throw 'Package inspection failed'}
+      - name: Windows x86 native runtime test
+        if: ${{ inputs.validation_only }}
+        shell: pwsh
+        run: |
+          python scripts/native_mode_test.py --exe dist/odm-0.1.0-dev-windows-386/odm.exe
+          if ($LASTEXITCODE) {throw 'Windows x86 runtime test failed'}
+      - name: Test x64 MSIX installation and upgrade on disposable runner
+        if: ${{ inputs.validation_only }}
+        shell: pwsh
+        run: ./scripts/windows_install_test.ps1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: development-msix-validation
@@ -111,6 +121,16 @@ jobs:
           if ($LASTEXITCODE) {throw 'Checksums failed'}
           python scripts/verify_artifacts.py --kind msix
           if ($LASTEXITCODE) {throw 'Package inspection failed'}
+      - name: Windows x86 native runtime test
+        if: ${{ inputs.validation_only }}
+        shell: pwsh
+        run: |
+          python scripts/native_mode_test.py --exe dist/odm-0.1.0-dev-windows-386/odm.exe
+          if ($LASTEXITCODE) {throw 'Windows x86 runtime test failed'}
+      - name: Test x64 MSIX installation and upgrade on disposable runner
+        if: ${{ inputs.validation_only }}
+        shell: pwsh
+        run: ./scripts/windows_install_test.ps1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unsigned-msix-review
