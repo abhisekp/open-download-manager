@@ -13,11 +13,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Native BitTorrent runs in-process. It does not send torrent operations to aria2.
 type NativeTorrents struct{ session *rain.Session }
+
+var nativeLogInitialization sync.Once
+
 type discardTorrentLog struct{}
 
 func (discardTorrentLog) SetFormatter(rainlog.Formatter) {}
@@ -43,9 +47,19 @@ func newNativeTorrents(data, downloads, host string) (*NativeTorrents, error) {
 	cfg.MaxMetadataSize = 4 << 20
 	cfg.MaxPeerDial = 32
 	cfg.MaxPeerAccept = 32
-	cfg.CustomLogHandler = discardTorrentLog{}
 	cfg.FilePermissions = 0700
-	session, e := rain.NewSession(cfg)
+	var session *rain.Session
+	var e error
+	// Rain's handler is process-global. Replacing it for a second session races
+	// with logger creation by the first session's peer goroutines.
+	nativeLogInitialization.Do(func() {
+		cfg.CustomLogHandler = discardTorrentLog{}
+		session, e = rain.NewSession(cfg)
+	})
+	if session == nil && e == nil {
+		cfg.CustomLogHandler = nil
+		session, e = rain.NewSession(cfg)
+	}
 	if e != nil {
 		return nil, e
 	}
