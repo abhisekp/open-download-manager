@@ -8,10 +8,17 @@ test "$(/usr/bin/odm --version)" = 0.1.0-dev
 test -f /usr/share/doc/open-download-manager/THIRD-PARTY-GO-NOTICES.txt
 python3 scripts/smoke.py --exe /usr/bin/odm
 python3 scripts/native_mode_test.py --exe /usr/bin/odm
-# Reinstallation checks package replacement; it does not claim a version upgrade.
+# Reinstall the same artifact, then test a package-version upgrade in a fixture.
 sudo dpkg --install "$package"
 test "$(/usr/bin/odm --version)" = 0.1.0-dev
+upgrade_root=$(mktemp -d)
+dpkg-deb --raw-extract "$package" "$upgrade_root/root"
+sed -i 's/^Version: 0.1.0~dev$/Version: 0.1.0~dev.1/' "$upgrade_root/root/DEBIAN/control"
+dpkg-deb --root-owner-group --build "$upgrade_root/root" "$upgrade_root/upgrade.deb"
+sudo dpkg --install "$upgrade_root/upgrade.deb"
+test "$(dpkg-query -W -f='${Version}' open-download-manager)" = '0.1.0~dev.1'
+python3 scripts/native_mode_test.py --exe /usr/bin/odm
 sudo dpkg --remove open-download-manager
 trap - EXIT
 test ! -e /usr/bin/odm
-echo 'PASS: Debian x64 install, real transfer, reinstall and uninstall'
+echo 'PASS: Debian x64 install, real transfer, reinstall, package-version upgrade and uninstall'

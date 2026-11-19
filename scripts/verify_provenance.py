@@ -4,10 +4,10 @@ import json
 import subprocess
 
 
-def verify(artifact, repository, source):
+def verify(artifact, repository, source, workflow='release.yml'):
     output = subprocess.check_output([
         'gh', 'attestation', 'verify', artifact, '--repo', repository,
-        '--signer-workflow', repository + '/.github/workflows/release.yml',
+        '--signer-workflow', repository + '/.github/workflows/' + workflow,
         '--deny-self-hosted-runners', '--format', 'json'], text=True, encoding='utf-8')
     records = json.loads(output)
     for record in records:
@@ -24,5 +24,6 @@ if __name__ == '__main__':
     parser.add_argument('artifact')
     parser.add_argument('--repo', required=True)
     parser.add_argument('--source', required=True)
+    parser.add_argument('--workflow', default='release.yml', choices=['release.yml', 'store-package.yml'])
     args = parser.parse_args()
-    verify(args.artifact, args.repo, args.source)
+    verify(args.artifact, args.repo, args.source, args.workflow)

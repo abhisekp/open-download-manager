@@ -16,5 +16,5 @@ for system,arch in targets:
         with tarfile.open(out/(stem+'.tar.gz'),'w:gz') as z:z.add(folder,arcname=stem)
 digests={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in out.iterdir() if f.is_file() and f.suffix in ['.zip','.gz']}
 (out/'SHA256SUMS').write_text(''.join(f'{v}  {k}\n' for k,v in sorted(digests.items())))
-(out/'build-targets.json').write_text(json.dumps({'version':'0.1.0-dev','targets':targets,'runtimeVerified':['windows/amd64'],'aria2Bundled':False},indent=2))
+(out/'build-targets.json').write_text(json.dumps({'version':'0.1.0-dev','targets':targets,'runtimeVerified':[],'runtimeEvidence':'See CI runtime and installation job results; this file records cross-compilation only.','aria2Bundled':False},indent=2))
 print('Built',len(targets),'portable targets. Cross-compilation does not establish runtime compatibility.')

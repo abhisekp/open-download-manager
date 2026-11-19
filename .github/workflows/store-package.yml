@@ -22,6 +22,10 @@ jobs:
     if: ${{ inputs.validation_only }}
     runs-on: windows-2025
     timeout-minutes: 35
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -70,12 +74,46 @@ jobs:
         if: ${{ inputs.validation_only }}
         shell: pwsh
         run: ./scripts/windows_install_test.ps1
+      - name: Generate and validate Windows dependency inventory
+        shell: pwsh
+        run: |
+          python scripts/sbom.py
+          if ($LASTEXITCODE) {throw 'SBOM generation failed'}
+          $tools=Join-Path $env:RUNNER_TEMP 'odm-sbom-tools'
+          python -m venv $tools
+          if ($LASTEXITCODE) {throw 'Tool environment failed'}
+          $python=Join-Path $tools 'Scripts/python.exe'
+          & $python -m pip install jsonschema==4.25.1
+          if ($LASTEXITCODE) {throw 'Schema validator install failed'}
+          & $python scripts/validate_sbom.py dist/odm.cdx.json
+          if ($LASTEXITCODE) {throw 'SBOM schema validation failed'}
+      - name: Attest MSIX build provenance
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-checksums: dist/SHA256SUMS
+      - name: Attest MSIX dependency inventory
+        id: inventory
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-checksums: dist/SHA256SUMS
+          sbom-path: dist/odm.cdx.json
+      - name: Retain attestation bundles
+        shell: pwsh
+        env:
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          SBOM_BUNDLE: ${{ steps.inventory.outputs.bundle-path }}
+        run: |
+          Copy-Item -LiteralPath $env:PROVENANCE_BUNDLE -Destination dist/provenance.sigstore.json
+          Copy-Item -LiteralPath $env:SBOM_BUNDLE -Destination dist/sbom.sigstore.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: development-msix-validation
           path: |
             dist/*.msix
             dist/SHA256SUMS
+            dist/odm.cdx.json
+            dist/*.sigstore.json
           if-no-files-found: error
           retention-days: 14
   package:
@@ -83,6 +121,10 @@ jobs:
     environment: microsoft-store-review
     runs-on: windows-2025
     timeout-minutes: 35
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -131,11 +173,45 @@ jobs:
         if: ${{ inputs.validation_only }}
         shell: pwsh
         run: ./scripts/windows_install_test.ps1
+      - name: Generate and validate Windows dependency inventory
+        shell: pwsh
+        run: |
+          python scripts/sbom.py
+          if ($LASTEXITCODE) {throw 'SBOM generation failed'}
+          $tools=Join-Path $env:RUNNER_TEMP 'odm-sbom-tools'
+          python -m venv $tools
+          if ($LASTEXITCODE) {throw 'Tool environment failed'}
+          $python=Join-Path $tools 'Scripts/python.exe'
+          & $python -m pip install jsonschema==4.25.1
+          if ($LASTEXITCODE) {throw 'Schema validator install failed'}
+          & $python scripts/validate_sbom.py dist/odm.cdx.json
+          if ($LASTEXITCODE) {throw 'SBOM schema validation failed'}
+      - name: Attest MSIX build provenance
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-checksums: dist/SHA256SUMS
+      - name: Attest MSIX dependency inventory
+        id: inventory
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-checksums: dist/SHA256SUMS
+          sbom-path: dist/odm.cdx.json
+      - name: Retain attestation bundles
+        shell: pwsh
+        env:
+          PROVENANCE_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          SBOM_BUNDLE: ${{ steps.inventory.outputs.bundle-path }}
+        run: |
+          Copy-Item -LiteralPath $env:PROVENANCE_BUNDLE -Destination dist/provenance.sigstore.json
+          Copy-Item -LiteralPath $env:SBOM_BUNDLE -Destination dist/sbom.sigstore.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unsigned-msix-review
           path: |
             dist/*.msix
             dist/SHA256SUMS
+            dist/odm.cdx.json
+            dist/*.sigstore.json
           if-no-files-found: error
           retention-days: 14

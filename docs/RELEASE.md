@@ -29,7 +29,7 @@ Both protected environments require reviewer `abhisekp` and allow the initiating
 
 ## Remaining release work
 
-No workflow currently publishes a public binary release or submits to Microsoft Store. Store identity/account access, certification, signing and clean install/update/uninstall tests remain necessary. Release candidates now generate a CycloneDX 1.6 dependency/artifact inventory, validate it against pinned official schemas, and generate GitHub/Sigstore provenance and SBOM attestations. These records are not executable Authenticode signatures. Windows x64 and Linux x64 have engine test evidence; cross-compilation alone does not verify the other architectures. ZIP, tar.gz, Debian and unsigned MSIX formats are implemented; RPM, AppImage, Flatpak and Snap remain planned.
+Public GitHub prerelease publication is now an optional, separately approved job, selected with publish_after_review=true outside validation mode. No public binary release or Store submission has been executed. Store identity/account access, certification, signing and clean install/update/uninstall tests remain necessary. Release candidates now generate a CycloneDX 1.6 dependency/artifact inventory, validate it against pinned official schemas, and generate GitHub/Sigstore provenance and SBOM attestations. These records are not executable Authenticode signatures. Windows x64 and Linux x64 have engine test evidence; cross-compilation alone does not verify the other architectures. ZIP, tar.gz, Debian and unsigned MSIX formats are implemented; RPM, AppImage, Flatpak and Snap remain planned.
 
 Keep secrets out of source and chat. Retain previous packages for a reviewed manual reinstall if necessary; no automatic rollback or credential rotation is performed.
 
@@ -40,3 +40,7 @@ CI now includes native ARM64 Windows/Linux tests, Linux x86 startup, emulated Li
 Release attestations require the checked-out source to equal the workflow dispatch SHA. Select the intended branch/tag as the workflow ref; draft creation should be dispatched on the reviewed tag. The source_ref input must resolve to the same SHA. Provenance verification enforces repository/workflow identity, artifact digest and exact source revision.
 
 Microsoft signs MSIX packages submitted through the Store after certification. A separately purchased signing certificate is not required for that route. Independently distributed Windows executables/MSIX have separate signing requirements. Partner Center account/name reservation, listing and app identity are still required. Source: https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options .
+
+## Prepared publication operation
+
+The optional publish job re-downloads the uploaded draft assets, verifies package digests and the source-bound attestations, then publishes the prerelease only after a second release-approval environment review. Validation mode never creates tags, drafts or releases. Store publication remains blocked by owner account registration and first-submission prerequisites; see STORE-READINESS.md.
