@@ -45,19 +45,22 @@ async function run() {
   const executable = process.platform === 'darwin' ? path.join(folder, 'Open Download Manager.app/Contents/MacOS/open-download-manager') : path.join(folder, process.platform === 'win32' ? 'open-download-manager.exe' : 'open-download-manager');
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'odm-package-'));
   const data = path.join(scratch, 'data'), files = path.join(scratch, 'files');
-  let child, page, fixture, exited = false, exitCode, phase = 'runtime startup';
+  let child, page, fixture, exited = false, exitCode, phase = 'runtime startup', stderrTail = '';
   const watchdog = setTimeout(() => { console.error('Packaged application test timed out'); child?.kill(); process.exit(1); }, 60000);
   try {
     child = spawn(executable, ['--data-dir', data, '--downloads', files, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1'], {windowsHide:true,stdio:['ignore','ignore','pipe']});
     const exit = new Promise(resolve => child.once('exit', code => { exited = true; exitCode = code; resolve(); }));
     const port = await new Promise((resolve, reject) => {
-      let buffer = '';
       const timer = setTimeout(() => reject(new Error('Packaged runtime did not expose its test window')), 20000);
       child.once('error', () => { clearTimeout(timer); reject(new Error('Packaged executable could not start')); });
-      child.once('exit', () => { clearTimeout(timer); reject(new Error('Packaged executable exited before startup')); });
+      child.once('exit', (code, signal) => {
+        clearTimeout(timer);
+        const diagnostic = stderrTail.replace(/[a-f0-9]{64}/g, '[private token]').trim().slice(-1200);
+        reject(new Error(`Packaged executable exited before startup (code ${code}, signal ${signal}): ${diagnostic}`));
+      });
       child.stderr.on('data', chunk => {
-        buffer = (buffer + chunk.toString('utf8')).slice(-16384);
-        const match = /DevTools listening on ws:\/\/127\.0\.0\.1:([0-9]+)\//.exec(buffer);
+        stderrTail = (stderrTail + chunk.toString('utf8')).slice(-16384);
+        const match = /DevTools listening on ws:\/\/127\.0\.0\.1:([0-9]+)\//.exec(stderrTail);
         if (match) { clearTimeout(timer); resolve(Number(match[1])); }
       });
     });
