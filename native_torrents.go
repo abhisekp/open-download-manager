@@ -7,9 +7,11 @@ import (
 	rainlog "github.com/cenkalti/log"
 	rain "github.com/cenkalti/rain/v2/torrent"
 	"github.com/zeebo/bencode"
+	bolt "go.etcd.io/bbolt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -31,6 +33,22 @@ func (discardTorrentLog) Close() error                   { return nil }
 func newNativeTorrents(data, downloads, host string) (*NativeTorrents, error) {
 	cfg := rain.DefaultConfig
 	cfg.Database = filepath.Join(data, "torrents.db")
+	// Rain's normal open can grow an invalid database before it reports failure.
+	// Validate existing metadata through a read-only handle before allowing writes.
+	if info, err := os.Lstat(cfg.Database); err == nil {
+		if !info.Mode().IsRegular() || info.Size() == 0 {
+			return nil, errors.New("torrent database requires recovery; original file retained")
+		}
+		check, err := bolt.Open(cfg.Database, 0600, &bolt.Options{ReadOnly: true, Timeout: time.Second})
+		if err != nil {
+			return nil, errors.New("torrent database metadata is invalid; original file retained")
+		}
+		if err = check.Close(); err != nil {
+			return nil, err
+		}
+	} else if !os.IsNotExist(err) {
+		return nil, err
+	}
 	cfg.DataDir = downloads
 	cfg.Host = host
 	cfg.RPCEnabled = false

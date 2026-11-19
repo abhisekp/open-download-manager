@@ -4,8 +4,8 @@ The target is an independent IDM/FDM/MDM-style desktop download manager with a f
 
 | Capability | Current milestone | Next acceptance gate |
 |---|---|---|
-| HTTP transfers | Local add/pause/resume/integrity test | TLS, redirects, authentication and network interruption matrix |
-| Parallel transfer/resume | aria2 configured for four connections | Verify server Range fallback, ETag changes and crash recovery |
+| HTTP transfers | Native fallback without aria2, TLS/redirect/Range/resource-change/interruption/checkpoint/collision tests, real pause/resume/integrity integration | Authentication UI/secure credential storage, segmented native transfers and wider server/platform compatibility |
+| Parallel transfer/resume | Optional aria2 four-connection transfers; native HTTP single-stream validator-aware resume and crash checkpoints | Native segmentation, broader parallel-server matrix and interrupted finalization recovery evidence |
 | Torrents/magnets | Native Rain integration, metadata import, local peer transfer and persistence tests | File selection, priorities, tracker editing, upload limits, public/private swarm matrix |
 | FTP/SFTP | Engine URI path accepted | Real protocol/authentication tests and credential storage design |
 | Queue | Engine concurrency limit, pause/resume, batch URL import | Reordering, per-host policies, queue groups |

@@ -6,7 +6,7 @@ for system,arch in targets:
     stem=f'odm-0.1.0-dev-{system}-{arch}';folder=out/stem;folder.mkdir(exist_ok=True)
     name='odm.exe' if system=='windows' else 'odm';env={**os.environ,'GOOS':system,'GOARCH':arch,'CGO_ENABLED':'0','GOARM':'7'}
     subprocess.run(['go','build','-trimpath','-ldflags=-s -w','-o',str(folder/name),'.'],cwd=root,env=env,check=True)
-    (folder/'INSTALL.txt').write_text('Native torrents are built in. For other protocols install aria2 for your architecture and put aria2c on PATH, then launch odm.\nThis is a browser-based local interface, not a native window.\nSee project README and release report for testing limitations.\n')
+    (folder/'INSTALL.txt').write_text('HTTP/HTTPS and torrents are built in. Optional aria2 adds FTP/SFTP and accelerated file transfers; install it for your architecture and put aria2c on PATH.\nThis is a browser-based local interface, not a native window.\nSee project README and release report for testing limitations.\n')
     (folder/name).chmod(0o755)
     for document in ['README.md','LICENSE','THIRD-PARTY-NOTICES.txt','THIRD-PARTY-GO-NOTICES.txt']:(folder/document).write_bytes((root/document).read_bytes())
     if system=='windows':

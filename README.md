@@ -6,7 +6,7 @@ The current build is an early implementation with a local browser interface base
 
 ## Run
 
-Install Go 1.26.11 and Node.js 22+ for source builds. For non-torrent transfers, install aria2 separately for your operating system and CPU, and put `aria2c` on PATH. Native torrents do not require aria2. The application never installs or downloads an engine automatically.
+Install Go 1.26.11 and Node.js 22+ for source builds. HTTP/HTTPS downloads and native torrents work without aria2. For FTP/SFTP and accelerated parallel file transfers, optionally install aria2 for your operating system and CPU and put `aria2c` on PATH. The application never installs or downloads an engine automatically.
 
 ```sh
 npm ci --prefix ui --ignore-scripts
@@ -17,12 +17,12 @@ go build -o odm .
 
 Windows: build with `go build -o odm.exe .` and run `odm.exe`. It opens a browser to an authenticated loopback session. `--no-browser` prints the launch link; treat that link as a local credential and do not share it. `--engine` accepts a full aria2 executable path. `--downloads` selects the download directory. `--data-dir` selects application data. Stop with Ctrl+C to save unfinished transfers; closing the browser leaves the app running. OS-backed data locking prevents concurrent ownership and recovers after abrupt termination. Legacy releases without an ownership marker are rejected conservatively; stop the old release before clearing its legacy lock.
 
-Portable archives under `dist/` contain the application, not aria2. External engine installation is still required. Linux needs a browser and `xdg-open`, or open the printed link manually. There is no desktop shortcut/tray/native window yet.
+Portable archives under `dist/` contain the application, not aria2. The basic HTTP/HTTPS and torrent engines are built in; optional engine installation adds other protocols and accelerated transfer features. Linux needs a browser and `xdg-open`, or open the printed link manually. There is no desktop shortcut/tray/native window yet.
 
 ## Current behavior
 
 - Download BitTorrent magnets and import `.torrent` files using the in-process MIT-licensed Rain library. Native torrent state is saved in a separate local database.
-- Add HTTP/HTTPS/FTP/SFTP file URLs through separately installed aria2.
+- Add HTTP/HTTPS file URLs through the built-in fallback when aria2 is absent; installed aria2 handles accelerated HTTP and FTP/SFTP. Native HTTP includes a three-transfer queue, validator-aware resume, crash checkpoints, safe collision handling, TLS checks, stall cancellation and persisted per-engine speed limits.
 - View progress, speed, connections and transfer states; pause, resume, remove, search, and filter torrents.
 - Import up to 50 newline-separated links with duplicate removal and per-link results.
 - Verify the first file of a completed transfer against an expected SHA-256 checksum (up to 1 GiB).

@@ -59,10 +59,12 @@ jobs:
           sudo apt-get install -y aria2 xdg-utils qemu-user
           go build -o /tmp/odm .
           python3 scripts/smoke.py --exe /tmp/odm
+          python3 scripts/smoke.py --exe /tmp/odm --native-http
           python3 scripts/recovery_test.py --exe /tmp/odm --root /tmp/odm-recovery
           python3 scripts/native_mode_test.py --exe /tmp/odm
-          python3 scripts/addons_test.py --exe /tmp/odm
+          python3 scripts/addons_test.py --exe /tmp/odm --native-http
           python3 scripts/lock_recovery_test.py --exe /tmp/odm
+          python3 scripts/degraded_engine_test.py --exe /tmp/odm
       - name: Install, launch and uninstall Debian package
         run: bash scripts/linux_install_test.sh
       - name: Exercise Linux x86 and emulated ARMv7 binaries
@@ -71,8 +73,9 @@ jobs:
           printf '#!/usr/bin/env bash\nexec qemu-arm "%s/dist/odm-0.1.0-dev-linux-arm/odm" "$@"\n' "$GITHUB_WORKSPACE" > /tmp/odm-arm-test
           chmod +x /tmp/odm-arm-test
           python3 scripts/native_mode_test.py --exe /tmp/odm
-          python3 scripts/addons_test.py --exe /tmp/odm
-          python3 scripts/lock_recovery_test.py --exe /tmp/odm-arm-test
+          python3 scripts/addons_test.py --exe /tmp/odm --native-http
+          python3 scripts/lock_recovery_test.py --exe /tmp/odm
+          python3 scripts/degraded_engine_test.py --exe /tmp/odm-arm-test
       - name: Validate Debian metadata
         run: |
           for package in dist/*.deb; do dpkg-deb --info "$package"; done
@@ -118,3 +121,4 @@ jobs:
           go build -o odm-runtime.exe .
           python scripts/native_mode_test.py --exe odm-runtime.exe
           python scripts/lock_recovery_test.py --exe odm-runtime.exe
+          python scripts/degraded_engine_test.py --exe odm-runtime.exe

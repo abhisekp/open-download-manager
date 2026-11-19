@@ -27,7 +27,7 @@ go run ./sdk/cmd/odm-addon-pack --generate-key /outside-source/publisher.key
 go run ./sdk/cmd/odm-addon-pack --manifest sdk/examples/clean-link/manifest.json --module /outside-source/clean-link.wasm --key /outside-source/publisher.key --license /outside-source/LICENSE --out /outside-source/clean-link.odmx
 ```
 
-On PowerShell, set `$env:GOOS='wasip1'` and `$env:GOARCH='wasm'` for the module build, then remove those environment variables before running the host packaging command. Choose a real writable directory outside source in place of `/outside-source`. Never commit the generated private key. The packer refuses to overwrite keys/packages and replaces the manifest module hash in the packaged copy.
+On PowerShell, set `$env:GOOS='wasip1'` and `$env:GOARCH='wasm'` for the module build, then remove those environment variables before running the host packaging command. Choose a real writable directory outside source in place of `/outside-source`. Never commit the generated private key. The packer refuses to overwrite keys/packages and supplies the module/license hashes in the packaged copy.
 
 The manifest declares API version, stable ID, display name, numeric `major.minor.patch` version, description, `url-resolver` capability, `input_hosts`, `output_hosts` `module_sha256` and `license_sha256`. The packer creates exactly five ZIP entries: manifest JSON, module, Ed25519 public key, signature and LICENSE. The signature covers the exact manifest bytes and the manifest binds both module and license digests. Provide the complete license text and compiled dependency notices for your module; packaging does not grant redistribution rights. The example combines original MIT and Go standard-library notices. A valid signature establishes key continuity, not a verified organization or safe code. The UI displays both publisher and package fingerprints for trust review.
 
@@ -43,6 +43,6 @@ The worker's 128 MiB Go memory target is a soft garbage-collection target, **not
 
 ## Verification
 
-`go test -race ./...` builds and runs real WASI fixtures, checks signature/digest tampering, publisher continuity, update grant revocation, persistence, input/output permissions, filesystem/network/environment denial, memory rejection and runaway-module cancellation. `python scripts/addons_test.py --exe <ODM executable>` builds and signs a local fixture, installs and invokes it through the authenticated API, performs an explicitly confirmed real transfer through aria2, then revokes and uninstalls the extension. This integration test needs aria2 installed.
+`go test -race ./...` builds and runs real WASI fixtures, checks signature/digest tampering, publisher continuity, update grant revocation, persistence, input/output permissions, filesystem/network/environment denial, memory rejection and runaway-module cancellation. `python scripts/addons_test.py --exe <ODM executable>` builds and signs a local fixture, installs and invokes it through the authenticated API, performs an explicitly confirmed real transfer through the selected file-transfer engine, then revokes and uninstalls the extension. Pass --native-http to verify the complete journey without aria2.
 
 The sandbox-probe example is a test fixture, not a useful end-user add-on. Full source-provider fetching and richer extension APIs remain separate milestones.

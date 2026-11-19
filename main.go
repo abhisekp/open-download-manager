@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/abhisekp/open-download-manager/internal/addons"
+	"github.com/abhisekp/open-download-manager/internal/transfers"
 )
 
 //go:embed ui/dist/client
@@ -101,15 +102,27 @@ func main() {
 	defer os.Remove(cfg)
 	native, err := newNativeTorrents(*data, *downloads, "0.0.0.0")
 	if err != nil {
-		log.Printf("Native torrent startup failed: %v", err)
-		return
+		log.Print("Native torrent engine unavailable; its database is retained for recovery")
+	} else {
+		defer native.Close()
 	}
-	defer native.Close()
 	engine := newEngine("", secret)
 	engine.Native = native
-	cmd := exec.Command(*enginePath, "--conf-path="+cfg, "--console-log-level=error", "--summary-interval=0")
+	direct, err := transfers.Open(transfers.Config{DataDir: *data, Downloads: *downloads})
+	if err != nil {
+		log.Print("Native HTTP registry could not be opened; its data is retained for recovery")
+	} else {
+		engine.HTTP = direct
+		engine.HTTPDirectory = *downloads
+		defer direct.Close()
+	}
+	storedLimit := uint64(0)
+	if direct != nil {
+		storedLimit = direct.Limit()
+	}
+	cmd := exec.Command(*enginePath, "--conf-path="+cfg, "--console-log-level=error", "--summary-interval=0", "--max-overall-download-limit="+strconv.FormatUint(storedLimit, 10))
 	if err = cmd.Start(); err != nil {
-		log.Print("aria2 is unavailable; native torrents remain available. Install aria2 for other protocols.")
+		log.Print("Optional aria2 engine is unavailable; FTP/SFTP require it. Settings reports built-in engine availability.")
 	} else {
 		defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
 		engine.URL = fmt.Sprintf("http://127.0.0.1:%d/jsonrpc", rpcPort)
@@ -122,7 +135,7 @@ func main() {
 			time.Sleep(100 * time.Millisecond)
 		}
 		if !ready {
-			log.Print("aria2 failed to start; native torrents remain available")
+			log.Print("Optional aria2 engine failed to start; built-in engines remain available")
 			engine.URL = ""
 		}
 	}
@@ -272,7 +285,11 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			stats, _ := a.engine.Call(r.Context(), "getGlobalStat")
-			respond(w, map[string]any{"downloads": all, "stats": stats, "directory": a.downloads, "version": version})
+			limit := uint64(0)
+			if a.engine.HTTP != nil {
+				limit = a.engine.HTTP.Limit()
+			}
+			respond(w, map[string]any{"downloads": all, "stats": stats, "directory": a.downloads, "version": version, "settings": map[string]any{"downloadLimit": strconv.FormatUint(limit, 10)}, "capabilities": map[string]bool{"http": a.engine.HTTP != nil || a.engine.ariaAvailable(), "torrents": a.engine.Native != nil, "ftp_sftp": a.engine.ariaAvailable()}})
 			return
 		case "/api/extensions":
 			respond(w, []Manifest{trackerManifest})
@@ -417,6 +434,14 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		out, e = a.engine.Call(r.Context(), "changeGlobalOption", map[string]string{"max-overall-download-limit": in.Limit})
+	case "/api/engine-check":
+		if a.engine.URL == "" {
+			http.Error(w, "Optional aria2 engine is not running; start ODM with aria2 installed to enable FTP/SFTP", 400)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		out, e = a.engine.Call(ctx, "getVersion")
 	case "/api/trackers":
 		if !in.Enabled {
 			http.Error(w, "grant this extension network access first", 403)

@@ -15,6 +15,7 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument('--exe', required=True)
+parser.add_argument('--native-http', action='store_true')
 args = parser.parse_args()
 payload = b'original legal add-on integration fixture\n' * 8192
 
@@ -47,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='odm-addons-') as temp:
     subprocess.run(command + ['--manifest', str(manifest_path), '--module', str(module), '--key', str(key), '--license', str(license_path), '--out', str(package)], cwd=ROOT, check=True)
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    child = subprocess.Popen([str(pathlib.Path(args.exe).resolve()), '--no-browser', '--data-dir', str(folder / 'data'), '--downloads', str(folder / 'downloads')], stdout=subprocess.PIPE, text=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    child = subprocess.Popen([str(pathlib.Path(args.exe).resolve()), '--no-browser', '--data-dir', str(folder / 'data'), '--downloads', str(folder / 'downloads')] + (['--engine', 'odm-deliberately-missing-aria2'] if args.native_http else []), stdout=subprocess.PIPE, text=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     base = token = None
     try:
         line = child.stdout.readline()

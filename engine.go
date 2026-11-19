@@ -10,16 +10,33 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
+
+	"github.com/abhisekp/open-download-manager/internal/transfers"
 )
 
 type Engine struct {
-	URL, Secret string
-	Client      *http.Client
-	Native      *NativeTorrents
+	URL, Secret   string
+	Client        *http.Client
+	Native        *NativeTorrents
+	HTTP          *transfers.Manager
+	HTTPDirectory string
+	rpcOffline    atomic.Bool
 }
 
+func (e *Engine) ariaAvailable() bool { return e.URL != "" && !e.rpcOffline.Load() }
+
 func (e *Engine) Call(ctx context.Context, method string, params ...any) (json.RawMessage, error) {
+	if method == "addUri" && len(params) > 0 && e.Native == nil {
+		if urls, ok := params[0].([]string); ok && len(urls) == 1 && torrentLink(urls[0]) {
+			return nil, errors.New("native torrent engine unavailable; preserve its database before recovery")
+		}
+	}
+	if handled, raw, err := e.callHTTP(method, params); handled {
+		return raw, err
+	}
+
 	if e.Native != nil {
 		if method == "addUri" && len(params) > 0 {
 			if urls, ok := params[0].([]string); ok && len(urls) == 1 && torrentLink(urls[0]) {
@@ -34,7 +51,7 @@ func (e *Engine) Call(ctx context.Context, method string, params ...any) (json.R
 			}
 		}
 	}
-	if e.URL == "" {
+	if e.URL == "" || e.rpcOffline.Load() && method != "getVersion" {
 		switch method {
 		case "tellActive", "tellWaiting", "tellStopped":
 			return e.mergeNative(method, json.RawMessage(`[]`)), nil
@@ -55,6 +72,10 @@ func (e *Engine) Call(ctx context.Context, method string, params ...any) (json.R
 	req.Header.Set("Content-Type", "application/json")
 	res, err := e.Client.Do(req)
 	if err != nil {
+		e.rpcOffline.Store(true)
+		if fallback, ok := e.localStatus(method); ok {
+			return fallback, nil
+		}
 		return nil, errors.New("transfer engine unavailable")
 	}
 	defer res.Body.Close()
@@ -66,14 +87,30 @@ func (e *Engine) Call(ctx context.Context, method string, params ...any) (json.R
 		} `json:"error"`
 	}
 	if err = json.NewDecoder(http.MaxBytesReader(nil, res.Body, 4<<20)).Decode(&out); err != nil {
+		e.rpcOffline.Store(true)
+		if fallback, ok := e.localStatus(method); ok {
+			return fallback, nil
+		}
 		return nil, err
 	}
+	e.rpcOffline.Store(false)
 	if out.Error != nil {
 		return nil, fmt.Errorf("engine error (%d): %s", out.Error.Code, out.Error.Message)
 	}
 	return e.mergeNative(method, out.Result), nil
 }
+
+func (e *Engine) localStatus(method string) (json.RawMessage, bool) {
+	switch method {
+	case "tellActive", "tellWaiting", "tellStopped":
+		return e.mergeNative(method, json.RawMessage(`[]`)), true
+	case "getGlobalStat":
+		return e.mergeNative(method, json.RawMessage(`{"downloadSpeed":"0","uploadSpeed":"0"}`)), true
+	}
+	return nil, false
+}
 func (e *Engine) mergeNative(method string, raw json.RawMessage) json.RawMessage {
+	raw = e.mergeHTTP(method, raw)
 	if e.Native == nil {
 		return raw
 	}

@@ -6,7 +6,7 @@ ODM is **not complete or production-ready**. The independent IDM/FDM/MDM product
 
 | Milestone | Current implementation | Required acceptance |
 |---|---|---|
-| Reliable transfer core | Native torrents; external aria2 for HTTP/FTP/SFTP; basic persistence and integrity checks | Out-of-box ordinary downloads, HTTP TLS/Range/redirect/authentication/interruption matrix, safe crash recovery, disk-full/collision/credential handling, real FTP/SFTP verification |
+| Reliable transfer core | Native torrents and fallback HTTP/HTTPS; optional aria2 for parallel HTTP/FTP/SFTP; checkpointed native resume and safe file finalization | Native HTTP platform evidence, authenticated-download UI/credential storage, native segmentation, disk-full matrix and real FTP/SFTP verification |
 | Desktop application | Local authenticated browser UI | Native window/tray, single instance and crash recovery, accessible keyboard journeys, notifications and clear shutdown behavior |
 | Add-on foundation | Signed local WASI URL resolvers, reviewed host permissions, isolated worker processes, persistence and install/disable/update/uninstall | Native platform tests and explicit real download handoff; OS-enforced worker RSS limits and independent hardening remain open |
 | Complete extension platform | Resolver SDK/API 1 and built-in tracker feed | Controlled provider networking/credentials, events/UI contributions, compatibility policy, richer examples and update distribution |
@@ -21,7 +21,7 @@ The requested desktop matrix is Windows x86/x64/ARM64, Linux x86/x64/ARMv7/ARM64
 
 The owner approved signed tag `v0.1.0-dev` at `979322938604eeafda854eafb944a27a01027b65`, draft preparation and an approval-gated experimental publication workflow. New product changes on main are outside that exact tagged build. Protected release reviews remain required; a development prerelease is not a stable production release.
 
-Microsoft Partner Center registration/name reservation are not set up, as confirmed by the owner. Store submission and certification cannot be completed without those owner steps. Store MSIX signing is provided by Microsoft after certification. Apple distribution identity/notarization availability has not been established. No paid service or signing purchase is authorized.
+Microsoft Partner Center registration/name reservation are not set up, as confirmed by the owner. Store submission and certification cannot be completed without those owner steps. Store MSIX signing is provided by Microsoft after certification. The owner excludes Apple Store publication and declines paid Apple Developer membership. macOS remains a direct-download target with explicit signing/notarization limitations; no paid Apple enrollment or Apple Store submission is authorized. Chrome Web Store, Edge Add-ons and Firefox publisher accounts are available and their use is authorized. No paid service or signing purchase is authorized.
 
 ## Current validation approach
 

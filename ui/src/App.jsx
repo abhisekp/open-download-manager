@@ -12,7 +12,7 @@ const size = (n) => {
       : (n / 1024).toFixed(1) + " KB";
 };
 const pct = (d) =>
-  Number(d.totalLength)
+  d.status === "complete" ? 100 : Number(d.totalLength)
     ? Math.min(100, (100 * Number(d.completedLength)) / Number(d.totalLength))
     : 0;
 const name = (d) =>
@@ -88,6 +88,10 @@ export function App() {
     [trackers, setTrackers] = useState([]),
     [notice, setNotice] = useState(""),
     [search, setSearch] = useState("");
+  const [limitLoaded, setLimitLoaded] = useState(false);
+  useEffect(() => {
+    if (!limitLoaded && data.settings) { setLimit(data.settings.downloadLimit); setLimitLoaded(true); }
+  }, [limitLoaded, data.settings]);
   async function api(path, body) {
     const res = await fetch("/api/" + path, {
       method: body ? "POST" : "GET",
@@ -585,8 +589,8 @@ export function App() {
               />
             </label>
             <p>
-              Use 0 for unlimited. Applies to aria2 transfers in this session;
-              native torrents have separate limits.
+              Use 0 for unlimited. Applies separately to the built-in HTTP and
+              optional file-transfer engines. Torrent limits are independent.
             </p>
             <button
               className="primary"
@@ -599,6 +603,9 @@ export function App() {
               Save speed limit
             </button>
             <div className="boundary">
+              <h3>Download support</h3>
+              <p>HTTP/HTTPS: {data.capabilities?.http ? "Available" : "Unavailable"}. Torrents: {data.capabilities?.torrents ? "Available" : "Unavailable—preserve torrent data before recovery"}. FTP/SFTP: {data.capabilities?.ftp_sftp ? "Available" : "Requires the optional aria2 engine"}.</p>
+              <button disabled={busy} onClick={async () => { if (await act("engine-check", {})) setNotice("Optional engine check completed."); }}>Check optional engine</button>
               <h3>Download folder</h3>
               <p>{data.directory}</p>
               <p>
@@ -612,9 +619,10 @@ export function App() {
               </p>
               <h3>Session recovery</h3>
               <p>
-                Unfinished transfers are saved every 10 seconds. Closing the
-                browser leaves downloads running. Stop the application with
-                Ctrl+C in its terminal to save and exit.
+                Built-in HTTP downloads keep durable checkpoints and restart
+                paused after an interruption. Closing the browser leaves
+                downloads running. Stop the application with Ctrl+C in its
+                terminal to save and exit.
               </p>
             </div>
           </section>
