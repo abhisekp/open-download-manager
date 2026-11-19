@@ -2,46 +2,119 @@ name: Prepare draft release
 on:
   workflow_dispatch:
     inputs:
+      validation_only:
+        description: Build and inspect artifacts without creating a release
+        default: true
+        type: boolean
+      source_ref:
+        description: Signed commit or branch to validate (ignored for draft creation)
+        default: main
+        type: string
       tag:
-        description: Existing reviewed tag (v0.1.0-dev)
-        required: true
+        description: Existing reviewed v0.1.0-dev tag (required for draft creation)
+        default: v0.1.0-dev
         type: string
 permissions:
   contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  draft:
-    environment: release-approval
+  validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    permissions:
-      contents: write
+    timeout-minutes: 30
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.validation_only && inputs.source_ref || inputs.tag }}
+          fetch-depth: 0
           persist-credentials: false
-      - name: Verify expected version and existing tag
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.11.1'
+          package-manager-cache: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify signed source and release tag
+        id: source
         env:
+          VALIDATION_ONLY: ${{ inputs.validation_only }}
           TAG: ${{ inputs.tag }}
         run: |
-          test "$TAG" = v0.1.0-dev
-          test "$(git tag --points-at HEAD)" = "$TAG"
           gpg --import .github/release-signers.asc
           git verify-commit --raw HEAD 2> signature.txt
           grep -q "VALIDSIG 0C11F14DCCBC95B710E92B988F9C80E5E7CE296A" signature.txt
-      - name: Validate and build
+          if [ "$VALIDATION_ONLY" != true ]; then
+            test "$TAG" = v0.1.0-dev
+            test "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$(git rev-parse HEAD)"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Validate and build candidates
         run: |
           npm ci --prefix ui --ignore-scripts
           npm run build --prefix ui
-          go test -race ./...
+          npm run test:sites --prefix ui
+          test -z "$(gofmt -l *.go)"
+          python3 -m unittest discover -s scripts -p "test_*.py"
+          go mod verify
           go vet ./...
+          go test -race ./...
+          (cd internal/nettoolscompat && go test -race ./...)
+          go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+          npm audit --prefix ui --omit=dev --audit-level=high
           python3 scripts/build.py
           python3 scripts/linux_packages.py
           node --test browser-extension/test.cjs
           python3 scripts/extensions.py
           python3 scripts/checksums.py
+          python3 scripts/verify_artifacts.py --kind portable
+          for package in dist/*.deb; do dpkg-deb --info "$package"; done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: release-candidate
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.deb
+            dist/SHA256SUMS
+            dist/build-targets.json
+          if-no-files-found: error
+          retention-days: 14
+  draft:
+    if: ${{ !inputs.validation_only }}
+    needs: validate
+    environment: release-approval
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: release-candidate
+          path: dist
+      - name: Verify candidate and require successful CI for exact source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.validate.outputs.sha }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          test "$TAG" = v0.1.0-dev
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)" = "$SOURCE_SHA"
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" -f head_sha="$SOURCE_SHA" -f status=success --jq '.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch") | .id' > ci-runs.txt
+          test -s ci-runs.txt
+          python3 scripts/verify_artifacts.py --kind portable
       - name: Create draft only
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
-        run: gh release create "$TAG" dist/*.zip dist/*.tar.gz dist/*.deb dist/SHA256SUMS --verify-tag --draft --prerelease --title "Open Download Manager $TAG" --notes-file docs/RELEASE-NOTES.md
+        run: gh release create "$TAG" dist/*.zip dist/*.tar.gz dist/*.deb dist/SHA256SUMS dist/build-targets.json --verify-tag --draft --prerelease --title "Open Download Manager $TAG" --notes-file docs/RELEASE-NOTES.md

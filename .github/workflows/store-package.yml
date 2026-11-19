@@ -2,25 +2,38 @@ name: Prepare Microsoft Store package
 on:
   workflow_dispatch:
     inputs:
+      validation_only:
+        description: Test packaging with a development identity; no Store submission
+        default: true
+        type: boolean
       identity_name:
-        description: Reserved package identity from Partner Center
-        required: true
+        description: Reserved Partner Center identity (required outside validation)
         type: string
       publisher:
-        description: Exact Publisher value from Partner Center (CN=...)
-        required: true
+        description: Exact Partner Center Publisher (required outside validation)
         type: string
 permissions:
   contents: read
+concurrency:
+  group: store-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  package:
-    environment: microsoft-store-review
-    runs-on: windows-latest
-    timeout-minutes: 30
+  validate:
+    if: ${{ inputs.validation_only }}
+    runs-on: windows-2025
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.11.1'
+          package-manager-cache: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5
+        with:
+          go-version-file: go.mod
+          cache: false
       - name: Build and verify source
         shell: pwsh
         run: |
@@ -30,9 +43,62 @@ jobs:
           if ($LASTEXITCODE) {throw 'UI build failed'}
           go test ./...
           if ($LASTEXITCODE) {throw 'Tests failed'}
+          go vet ./...
+          if ($LASTEXITCODE) {throw 'Static checks failed'}
           python scripts/build.py
           if ($LASTEXITCODE) {throw 'Build matrix failed'}
-      - name: Package reserved identity
+      - name: Package and inspect all Windows architectures
+        shell: pwsh
+        env:
+          ODM_IDENTITY: OpenDownloadManager.Development
+          ODM_PUBLISHER: CN=OpenDownloadManager.Development
+        run: |
+          foreach ($architecture in @('x86','x64','arm64')) {
+            ./scripts/package-msix.ps1 -Architecture $architecture -IdentityName $env:ODM_IDENTITY -Publisher $env:ODM_PUBLISHER
+          }
+          python scripts/checksums.py --kind msix
+          if ($LASTEXITCODE) {throw 'Checksums failed'}
+          python scripts/verify_artifacts.py --kind msix
+          if ($LASTEXITCODE) {throw 'Package inspection failed'}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: development-msix-validation
+          path: |
+            dist/*.msix
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+  package:
+    if: ${{ !inputs.validation_only }}
+    environment: microsoft-store-review
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.11.1'
+          package-manager-cache: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build and verify source
+        shell: pwsh
+        run: |
+          npm ci --prefix ui --ignore-scripts
+          if ($LASTEXITCODE) {throw 'Dependency install failed'}
+          npm run build --prefix ui
+          if ($LASTEXITCODE) {throw 'UI build failed'}
+          go test ./...
+          if ($LASTEXITCODE) {throw 'Tests failed'}
+          go vet ./...
+          if ($LASTEXITCODE) {throw 'Static checks failed'}
+          python scripts/build.py
+          if ($LASTEXITCODE) {throw 'Build matrix failed'}
+      - name: Package and inspect all Windows architectures
         shell: pwsh
         env:
           ODM_IDENTITY: ${{ inputs.identity_name }}
@@ -41,8 +107,15 @@ jobs:
           foreach ($architecture in @('x86','x64','arm64')) {
             ./scripts/package-msix.ps1 -Architecture $architecture -IdentityName $env:ODM_IDENTITY -Publisher $env:ODM_PUBLISHER
           }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+          python scripts/checksums.py --kind msix
+          if ($LASTEXITCODE) {throw 'Checksums failed'}
+          python scripts/verify_artifacts.py --kind msix
+          if ($LASTEXITCODE) {throw 'Package inspection failed'}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: unsigned-msix-review
-          path: dist/*.msix
+          path: |
+            dist/*.msix
+            dist/SHA256SUMS
+          if-no-files-found: error
           retention-days: 14

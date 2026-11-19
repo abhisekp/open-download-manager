@@ -1,35 +1,34 @@
-# Release preparation
+# Release workflows
 
-Development version: 0.1.0-dev. A public repository has been created at https://github.com/abhisekp/open-download-manager after explicit user approval. Signed source push, release artifacts and workflow execution are recorded separately in the verification report. No Store submission or production infrastructure has been created.
+ODM is an MIT-licensed development application. Packaging success does not establish installation compatibility, certification, executable signing or full feature completion.
 
-## Prepared workflows
+## Verification
 
-`.github/workflows/ci.yml` builds UI, runs tests/static checks/audit, cross-compiles seven portable targets and uploads CI artifacts. External actions are pinned to verified upstream commit IDs. `.github/workflows/release.yml` is manual and creates a **draft prerelease only**, from the existing `v0.1.0-dev` tag after commit signature verification. Configure `release-approval` as a protected environment with required reviewers before enabling it. Files alone do not establish protection.
+`ci.yml` runs on pushes, pull requests and manual dispatch. It builds the interface, runs Go race tests and security scans, verifies browser extension tests, builds seven portable targets and four Debian packages, checks package contents and SHA-256 digests, and exercises the real download engines on Linux x64. Node 24.11.1 and the Go toolchain in go.mod are installed explicitly. Actions use immutable upstream commit pins.
 
-The workflows have not run on GitHub. Runner-installed Go/Node tools are inventoried but not pinned; pin reviewed tool versions before reproducibility claims. No SBOM/provenance or executable signing is currently implemented. Checksums establish integrity only, not provenance or publisher authenticity. Complete license inventory, artifact scanning and clean-install tests before release.
+Local workflow validation:
+```text
+actionlint
+python -m unittest discover -s scripts -p "test_*.py"
+python scripts/verify_artifacts.py --kind portable
+```
 
-## Target matrix
+## Release candidate validation
 
-| OS | Architectures | Prepared format | Runtime status |
-|---|---|---|---|
-| Windows | x86 (386), x64 (amd64), ARM64 | ZIP | x64 local evidence only |
-| Linux | x86, x64, ARMv7, ARM64 | tar.gz, Debian .deb | Not runtime-tested |
+Run **Prepare draft release** with `validation_only=true` (default) and `source_ref=main` or a signed commit SHA. This verifies the approved commit signer, runs quality gates, builds and inspects all 14 portable/Debian/extension archives, and uploads a `release-candidate` artifact. It creates no tag or release.
 
-The Go application includes native BitTorrent and cross-compiles independently of aria2. A browser is required; non-torrent protocols need an architecture-matched aria2 engine. Windows ARM32 is not targeted; ARM means ARM64 on Windows and ARMv7/ARM64 on Linux. AppImage, RPM, Flatpak, Snap and native Windows installers remain packaging milestones rather than fake renamed archives.
+To create a draft, first obtain approval for the exact source/version/artifacts and create the reviewed `v0.1.0-dev` tag. Dispatch with `validation_only=false` and that tag. The separate `draft` job requires the configured `release-approval` environment review, verifies that the tag still resolves to the validated SHA, requires successful CI for that exact SHA, downloads the same candidate artifacts and rechecks their digests. It creates an unpublished draft prerelease only. Publishing the draft is a separate approval and operation. Existing drafts fail safely instead of being overwritten.
 
-## Microsoft Store gate
+## Windows package validation
 
-The manual `store-package.yml` workflow prepares unsigned MSIX review artifacts; Store submission is **not automated or ready**. The current app optionally uses external aria2 for non-torrent protocols and launches a browser; Store feasibility must be validated before packaging. Required next work: decide a compliant native shell/launch model; bundle architecture-matched reviewed engine builds with GPL obligations; reserve an app identity in Partner Center; obtain Publisher/Identity values; create Store artwork and privacy/support pages; generate real MSIX packages; run certification and install/update/uninstall tests; then add authenticated submission automation behind a protected environment. Do not submit an archive as an MSIX or use placeholder publisher identities.
+Run **Prepare Microsoft Store package** with `validation_only=true` (default). Windows Server 2025 builds the source and uses the Windows SDK to package x86, x64 and ARM64 unsigned MSIX files with the explicit development identity `OpenDownloadManager.Development`. Archive integrity, manifest architecture, required files and digests are checked. The `development-msix-validation` artifact contains the three MSIX files and their checksums. Development identity packages are not Store submissions.
 
-Microsoft supports scripted submissions through its Developer CLI/API and GitHub Actions, but Partner Center identity, role access and certification are separate requirements. Credentials belong in the provider's secure configuration, never chat or source. No Store credential or account was inspected.
+For reserved-identity packaging, dispatch with `validation_only=false` and the exact Partner Center identity and Publisher. The separate `package` job retains the configured `microsoft-store-review` approval gate. It produces unsigned review files; it does not submit them.
 
-## Publication approval
+Both protected environments require reviewer `abhisekp` and allow the initiating user to approve, as explicitly requested. Validation jobs have read-only repository permission and no environment secrets.
 
-Before any remote write, review the source and report, choose a repository and visibility, and approve the exact signed source push. A new repository should remain private until explicit public-source approval. Open-source intent supplies a licensing direction, but does not publish private workspace contents. Release/tag/Store publication needs its own concrete artifact approval.
+## Remaining release work
 
-Sources checked 2026-11-18/19:
-- https://learn.microsoft.com/en-us/windows/apps/publish/
-- https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/create-app-submission
-- https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/choose-distribution-path
-- https://go.dev/doc/install/source
-- https://aria2.github.io/manual/en/html/aria2c.html
+No workflow currently publishes a public binary release or submits to Microsoft Store. Store identity/account access, certification, signing and clean install/update/uninstall tests remain necessary. No SBOM or provenance attestation is generated. Windows x64 and Linux x64 have engine test evidence; cross-compilation alone does not verify the other architectures. ZIP, tar.gz, Debian and unsigned MSIX formats are implemented; RPM, AppImage, Flatpak and Snap remain planned.
+
+Keep secrets out of source and chat. Retain previous packages for a reviewed manual reinstall if necessary; no automatic rollback or credential rotation is performed.
