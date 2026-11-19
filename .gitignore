@@ -1,0 +1,15 @@
+ui/node_modules/
+ui/dist/
+dist/
+odm.exe
+odm-*.exe
+*.log
+*.conf
+*.session
+running.lock/
+
+# Local review evidence; do not publish personal browser/session screenshots.
+docs/*-preview.jpg
+docs/selected-design.jpg
+docs/visual-comparison.jpg
+docs/public-repository.jpg

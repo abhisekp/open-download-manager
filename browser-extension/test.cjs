@@ -1,0 +1,6 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const {parsePairing,validLink,send}=require('./shared/connection.js');
+const good={endpoint:'http://127.0.0.1:8123',token:'a'.repeat(64),origin:'chrome-extension://'+'a'.repeat(32)};
+test('pairing stays on numeric loopback and rejects credentials or paths',()=>{assert.equal(parsePairing(JSON.stringify(good)).endpoint,good.endpoint);for(const endpoint of ['https://evil.example','http://127.0.0.1.evil:80','http://user:pass@127.0.0.1:123','http://127.0.0.1:123/private','http://[::1]:123'])assert.throws(()=>parsePairing(JSON.stringify({...good,endpoint})))});
+test('reject active or local file schemes',()=>{assert.equal(validLink('file:///etc/passwd'),false);assert.equal(validLink('javascript:alert(1)'),false);assert.equal(validLink('https://example.com/file'),true)});
+test('only sends explicit link with scoped token',async()=>{let request;await send(good,'https://example.com/file',async(url,options)=>{request={url,options};return {ok:true,json:async()=>({gid:'test'})}});assert.equal(request.url,good.endpoint+'/bridge/add');assert.equal(request.options.headers.Authorization,'Bearer '+good.token);assert.deepEqual(JSON.parse(request.options.body),{url:'https://example.com/file'});assert.equal(request.options.headers.Cookie,undefined)});

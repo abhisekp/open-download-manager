@@ -1,0 +1,6 @@
+const $=id=>document.getElementById(id),identity=chrome.runtime.getURL('').replace(/\/$/,'');$('identity').value=identity;
+const status=text=>{$('status').textContent=text};
+chrome.tabs.query({active:true,currentWindow:true}).then(tabs=>{if(ODMConnection.validLink(tabs[0]?.url))$('url').value=tabs[0].url}).catch(()=>{});
+$('pair').addEventListener('submit',async e=>{e.preventDefault();try{const connection=ODMConnection.parsePairing($('pairing').value);if(connection.origin!==identity)throw new Error('This pairing belongs to a different browser identity.');await chrome.storage.local.set({connection});$('pairing').value='';status('Pairing saved on this device.')}catch(error){status(error.message)}});
+$('disconnect').addEventListener('click',async()=>{await chrome.storage.local.remove('connection');status('Pairing forgotten. Revoke it in ODM Settings to invalidate the token.');});
+$('send').addEventListener('submit',async e=>{e.preventDefault();try{const {connection}=await chrome.storage.local.get('connection');if(!connection)throw new Error('Connect to ODM first.');await ODMConnection.send(connection,$('url').value.trim());status('Download added to ODM.')}catch(error){status(error.message)}});

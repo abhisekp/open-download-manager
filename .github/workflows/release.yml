@@ -1,0 +1,47 @@
+name: Prepare draft release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing reviewed tag (v0.1.0-dev)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  draft:
+    environment: release-approval
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - name: Verify expected version and existing tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          test "$TAG" = v0.1.0-dev
+          test "$(git tag --points-at HEAD)" = "$TAG"
+          gpg --import .github/release-signers.asc
+          git verify-commit --raw HEAD 2> signature.txt
+          grep -q "VALIDSIG 0C11F14DCCBC95B710E92B988F9C80E5E7CE296A" signature.txt
+      - name: Validate and build
+        run: |
+          npm ci --prefix ui --ignore-scripts
+          npm run build --prefix ui
+          go test -race ./...
+          go vet ./...
+          python3 scripts/build.py
+          python3 scripts/linux_packages.py
+          node --test browser-extension/test.cjs
+          python3 scripts/extensions.py
+          python3 scripts/checksums.py
+      - name: Create draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release create "$TAG" dist/*.zip dist/*.tar.gz dist/*.deb dist/SHA256SUMS --verify-tag --draft --prerelease --title "Open Download Manager $TAG" --notes-file docs/RELEASE-NOTES.md
