@@ -150,6 +150,7 @@ func (h *History) write() error {
 	}
 	return os.Rename(tmp, h.path)
 }
+
 // Capture before requesting engine results, so delayed replies cannot undo a
 // subsequent history mutation. The token is process-local; ownership excludes
 // another ODM process from writing the same data directory.
