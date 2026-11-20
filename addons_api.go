@@ -49,13 +49,15 @@ func (a *App) addonsAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		ID      string `json:"id"`
-		Enabled bool   `json:"enabled"`
-		URL     string `json:"url"`
+		ID              string `json:"id"`
+		Enabled         bool   `json:"enabled"`
+		URL             string `json:"url"`
+		NetworkApproved bool   `json:"networkApproved"`
+		Digest          string `json:"digest"`
 	}
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384))
 	d.DisallowUnknownFields()
-	if d.Decode(&in) != nil {
+	if d.Decode(&in) != nil || d.Decode(new(any)) != io.EOF {
 		http.Error(w, "invalid request", 400)
 		return
 	}
@@ -67,7 +69,7 @@ func (a *App) addonsAPI(w http.ResponseWriter, r *http.Request) {
 		err = a.addons.Uninstall(in.ID)
 	case "/api/addons/resolve":
 		var urls []string
-		urls, err = a.addons.Resolve(r.Context(), in.ID, in.URL)
+		urls, err = a.addons.ResolveApproved(r.Context(), in.ID, in.URL, addons.ResolveApproval{Network: in.NetworkApproved, Digest: in.Digest})
 		if err == nil {
 			respond(w, map[string]any{"urls": urls})
 			return

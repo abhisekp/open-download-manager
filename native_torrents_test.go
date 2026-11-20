@@ -124,7 +124,7 @@ func TestNativeTorrentLocalPeerAndPersistence(t *testing.T) {
 	}
 }
 func TestNativeTorrentRejectsUnsafeMetadata(t *testing.T) {
-	root := t.TempDir()
+	root := ownedTestDir(t)
 	n, e := newNativeTorrents(root, filepath.Join(root, "files"), "127.0.0.1")
 	if e != nil {
 		t.Fatal(e)

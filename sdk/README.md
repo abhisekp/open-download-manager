@@ -1,6 +1,6 @@
-# ODM add-on SDK — API 1
+# ODM add-on SDK — APIs 1 and 2
 
-Original SDK code is MIT licensed. API 1 currently supports `url-resolver` modules using WASI Preview 1. This is separate from browser companion extensions and the legacy built-in tracker feed. It does not yet provide provider network requests, arbitrary UI contributions, storage, event subscriptions or automatic updates.
+Original SDK code is MIT licensed. APIs 1 and 2 support signed `url-resolver` modules using WASI Preview 1. API 2 adds separately approved [provider HTTPS requests](NETWORK.md). This is separate from browser companion extensions and the legacy built-in tracker feed. Provider credentials, arbitrary UI contributions, storage, event subscriptions and automatic update distribution remain separate milestones.
 
 ## Contract
 
@@ -29,7 +29,7 @@ go run ./sdk/cmd/odm-addon-pack --manifest sdk/examples/clean-link/manifest.json
 
 On PowerShell, set `$env:GOOS='wasip1'` and `$env:GOARCH='wasm'` for the module build, then remove those environment variables before running the host packaging command. Choose a real writable directory outside source in place of `/outside-source`. Never commit the generated private key. The packer refuses to overwrite keys/packages and supplies the module/license hashes in the packaged copy.
 
-The manifest declares API version, stable ID, display name, numeric `major.minor.patch` version, description, `url-resolver` capability, `input_hosts`, `output_hosts` `module_sha256` and `license_sha256`. The packer creates exactly five ZIP entries: manifest JSON, module, Ed25519 public key, signature and LICENSE. The signature covers the exact manifest bytes and the manifest binds both module and license digests. Provide the complete license text and compiled dependency notices for your module; packaging does not grant redistribution rights. The example combines original MIT and Go standard-library notices. A valid signature establishes key continuity, not a verified organization or safe code. The UI displays both publisher and package fingerprints for trust review.
+API 2 also permits an optional `network_hosts` list of exact public HTTPS destinations, reviewed at installation and again for each resolution. API 1 packages cannot declare network permissions. The manifest declares API version, stable ID, display name, numeric `major.minor.patch` version, description, `url-resolver` capability, `input_hosts`, `output_hosts` `module_sha256` and `license_sha256`. The packer creates exactly five ZIP entries: manifest JSON, module, Ed25519 public key, signature and LICENSE. The signature covers the exact manifest bytes and the manifest binds both module and license digests. Provide the complete license text and compiled dependency notices for your module; packaging does not grant redistribution rights. The example combines original MIT and Go standard-library notices. A valid signature establishes key continuity, not a verified organization or safe code. The UI displays both publisher and package fingerprints for trust review.
 
 ## Lifecycle
 
@@ -37,7 +37,7 @@ Choose the package under Extensions, review its hosts/key, approve that exact pa
 
 ## Isolation and limits
 
-Each invocation starts an isolated ODM worker process containing the wazero interpreter. WASI receives no filesystem mounts, inherited environment, network sockets or subprocess imports. The core verifies installed package integrity before each invocation. Two workers may run concurrently, with a five-second overall deadline, a two-second VM deadline, 64 MiB maximum WASM linear memory and 256 KiB output per stream. Packages/uncompressed entries are bounded to 8 MiB; installation is limited to 16 add-ons. Worker startup receives only a Windows system path where necessary and Go runtime resource settings.
+Each invocation starts an isolated ODM worker process containing the wazero interpreter. WASI receives no filesystem mounts, inherited environment, network sockets or subprocess imports. The core verifies installed package integrity before each invocation. Two workers may run concurrently. API 1 has a five-second overall and two-second VM deadline; API 2 has twelve/eight-second deadlines. Both enforce 64 MiB maximum WASM linear memory and 256 KiB output per stream. API 2 requests have additional count/body/transport bounds documented in NETWORK.md. Packages/uncompressed entries are bounded to 8 MiB; installation is limited to 16 add-ons. Worker startup receives only a Windows system path where necessary and Go runtime resource settings.
 
 The worker's 128 MiB Go memory target is a soft garbage-collection target, **not an OS-enforced RSS limit**. OS job/cgroup enforcement and deeper independent runtime hardening remain production gates. Revocation waits for an already-running bounded invocation to finish; once revocation returns, no subsequent invocation is allowed. No claim of arbitrary-code safety beyond these configured and tested boundaries is made.
 
@@ -45,4 +45,4 @@ The worker's 128 MiB Go memory target is a soft garbage-collection target, **not
 
 `go test -race ./...` builds and runs real WASI fixtures, checks signature/digest tampering, publisher continuity, update grant revocation, persistence, input/output permissions, filesystem/network/environment denial, memory rejection and runaway-module cancellation. `python scripts/addons_test.py --exe <ODM executable>` builds and signs a local fixture, installs and invokes it through the authenticated API, performs an explicitly confirmed real transfer through the selected file-transfer engine, then revokes and uninstalls the extension. Pass --native-http to verify the complete journey without aria2.
 
-The sandbox-probe example is a test fixture, not a useful end-user add-on. Full source-provider fetching and richer extension APIs remain separate milestones.
+The sandbox-probe example is a test fixture, not a useful end-user add-on. API 2 supplies controlled public HTTPS fetching; provider-specific adapters, credential brokering and richer extension APIs remain separate milestones. The network-echo demonstration requires separate per-link/package approval; use synthetic input only.

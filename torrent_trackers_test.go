@@ -107,7 +107,7 @@ func TestTrackerBatchReportsCommittedPrefixOnStorageFailure(t *testing.T) {
 
 func TestNativeTrackerApprovalPrivacyMetadataAndPersistence(t *testing.T) {
 	server, count := trackerFixture(t)
-	root := t.TempDir()
+	root := ownedTestDir(t)
 	files := filepath.Join(root, "files")
 	native, err := newNativeTorrents(root, files, "127.0.0.1")
 	if err != nil {
@@ -191,7 +191,7 @@ func TestNativeTrackerApprovalPrivacyMetadataAndPersistence(t *testing.T) {
 }
 
 func TestNativeTrackerConcurrentDedupAndRemoval(t *testing.T) {
-	root := t.TempDir()
+	root := ownedTestDir(t)
 	native, err := newNativeTorrents(root, filepath.Join(root, "files"), "127.0.0.1")
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestNativeTrackerConcurrentDedupAndRemoval(t *testing.T) {
 }
 
 func TestTorrentTrackerAPIAuthorizationAndValidation(t *testing.T) {
-	root := t.TempDir()
+	root := ownedTestDir(t)
 	native, err := newNativeTorrents(root, filepath.Join(root, "files"), "127.0.0.1")
 	if err != nil {
 		t.Fatal(err)

@@ -7,15 +7,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/abhisekp/open-download-manager/internal/processutil"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -224,7 +227,22 @@ func (b *limitedOutput) Write(p []byte) (int, error) {
 }
 
 func (s *Store) Resolve(ctx context.Context, id, input string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	return s.ResolveApproved(ctx, id, input, ResolveApproval{})
+}
+
+type ResolveApproval struct {
+	Network bool
+	Digest  string
+}
+
+func (s *Store) ResolveApproved(ctx context.Context, id, input string, approval ResolveApproval) ([]string, error) {
+	overall := 5 * time.Second
+	s.mu.RLock()
+	if s.entries[id].Manifest.API == 2 {
+		overall = 12 * time.Second
+	}
+	s.mu.RUnlock()
+	ctx, cancel := context.WithTimeout(ctx, overall)
 	defer cancel()
 	select {
 	case s.gate <- struct{}{}:
@@ -237,6 +255,9 @@ func (s *Store) Resolve(ctx context.Context, id, input string) ([]string, error)
 	entry, ok := s.entries[id]
 	if !ok || !entry.Enabled {
 		return nil, errors.New("add-on is disabled or not installed")
+	}
+	if len(entry.Manifest.NetworkHosts) > 0 && (!approval.Network || approval.Digest != entry.Digest) {
+		return nil, errors.New("network requests need approval for this exact add-on package; refresh and review its hosts again")
 	}
 	if !permitted(input, entry.Manifest.InputHosts) {
 		return nil, errors.New("input URL is outside approved hosts")
@@ -251,7 +272,7 @@ func (s *Store) Resolve(ctx context.Context, id, input string) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	body, err := json.Marshal(workerRequest{Module: pkg.Module, URL: input})
+	body, err := json.Marshal(workerRequest{Module: pkg.Module, URL: input, API: entry.Manifest.API, NetworkHosts: entry.Manifest.NetworkHosts})
 	if err != nil {
 		return nil, err
 	}
@@ -293,27 +314,79 @@ func (s *Store) Resolve(ctx context.Context, id, input string) ([]string, error)
 }
 
 type workerRequest struct {
-	Module []byte `json:"module"`
-	URL    string `json:"url"`
+	Module       []byte   `json:"module"`
+	URL          string   `json:"url"`
+	API          int      `json:"api,omitempty"`
+	NetworkHosts []string `json:"network_hosts,omitempty"`
 }
 
-// Worker executes only WASI Preview 1 with no filesystem, environment or sockets.
+// Worker provides WASI Preview 1 without mounts, environment or socket imports.
+// API 2 may also use the reviewed, bounded public-HTTPS host capability.
 // GOMEMLIMIT bounds GC targets, not total process RSS. Linear memory has a hard cap.
 func Worker(input io.Reader, output, errorOutput io.Writer) error {
+	return worker(input, output, errorOutput, nil)
+}
+
+func worker(input io.Reader, output, errorOutput io.Writer, client *http.Client) error {
 	var request workerRequest
 	d := json.NewDecoder(io.LimitReader(input, MaxPackage*4/3+16384))
 	d.DisallowUnknownFields()
-	if d.Decode(&request) != nil || len(request.Module) > MaxPackage || len(request.URL) > 8192 {
+	if d.Decode(&request) != nil || d.Decode(new(any)) != io.EOF || len(request.Module) > MaxPackage || len(request.URL) > 8192 {
 		return errors.New("invalid worker request")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	if request.API == 0 {
+		request.API = 1
+	}
+	if (request.API != 1 && request.API != 2) || (request.API == 1 && len(request.NetworkHosts) > 0) || len(request.NetworkHosts) > 16 {
+		return errors.New("unsupported worker capability")
+	}
+	seen := map[string]bool{}
+	for _, host := range request.NetworkHosts {
+		if len(host) > 253 || !hostname.MatchString(host) || strings.Contains(host, "..") || seen[host] {
+			return errors.New("invalid worker network permission")
+		}
+		seen[host] = true
+	}
+	deadline := 2 * time.Second
+	if request.API == 2 {
+		deadline = 8 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter().WithMemoryLimitPages(1024).WithCloseOnContextDone(true))
 	defer rt.Close(context.Background())
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, rt); err != nil {
 		return err
 	}
-	body, _ := json.Marshal(map[string]any{"api": 1, "operation": "resolve", "url": request.URL})
+	if request.API == 2 {
+		if client == nil {
+			client = providerClient(nil)
+		}
+		defer client.CloseIdleConnections()
+		budget := &providerBudget{}
+		_, err := rt.NewHostModuleBuilder("odm").NewFunctionBuilder().WithFunc(func(ctx context.Context, module api.Module, urlPointer, urlLength, outputPointer, capacity uint32) int32 {
+			memory := module.Memory()
+			if memory == nil || urlLength > 8192 || capacity == 0 || capacity > providerResponseLimit {
+				return -1
+			}
+			raw, ok := memory.Read(urlPointer, urlLength)
+			if !ok {
+				return -1
+			}
+			if _, ok = memory.Read(outputPointer, capacity); !ok {
+				return -1
+			}
+			body, err := budget.get(ctx, client, request.NetworkHosts, string(raw), capacity)
+			if err != nil || !memory.Write(outputPointer, body) {
+				return -1
+			}
+			return int32(len(body))
+		}).Export("http_get").Instantiate(ctx)
+		if err != nil {
+			return err
+		}
+	}
+	body, _ := json.Marshal(map[string]any{"api": request.API, "operation": "resolve", "url": request.URL})
 	_, err := rt.InstantiateWithConfig(ctx, request.Module, wazero.NewModuleConfig().WithStdin(bytes.NewReader(body)).WithStdout(output).WithStderr(errorOutput))
 	return err
 }

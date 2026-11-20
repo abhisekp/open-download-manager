@@ -1,0 +1,11 @@
+{
+  "api": 2,
+  "id": "org.odm.network-echo",
+  "name": "Reviewed network echo example",
+  "version": "1.0.0",
+  "description": "SDK demonstration: sends the entire reviewed input link to httpbin.org and suggests its echoed link. Use synthetic links only.",
+  "capability": "url-resolver",
+  "input_hosts": ["example.com"],
+  "output_hosts": ["example.com"],
+  "network_hosts": ["httpbin.org"]
+}

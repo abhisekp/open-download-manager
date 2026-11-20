@@ -19,16 +19,17 @@ import (
 const MaxPackage = 8 << 20
 
 type Manifest struct {
-	API         int      `json:"api"`
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Version     string   `json:"version"`
-	Description string   `json:"description"`
-	Capability  string   `json:"capability"`
-	InputHosts  []string `json:"input_hosts"`
-	OutputHosts []string `json:"output_hosts"`
-	ModuleHash  string   `json:"module_sha256"`
-	LicenseHash string   `json:"license_sha256"`
+	API          int      `json:"api"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Version      string   `json:"version"`
+	Description  string   `json:"description"`
+	Capability   string   `json:"capability"`
+	InputHosts   []string `json:"input_hosts"`
+	OutputHosts  []string `json:"output_hosts"`
+	NetworkHosts []string `json:"network_hosts,omitempty"`
+	ModuleHash   string   `json:"module_sha256"`
+	LicenseHash  string   `json:"license_sha256"`
 }
 
 type Info struct {
@@ -51,7 +52,7 @@ var semver = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9
 var hostname = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$`)
 
 func (m Manifest) Validate() error {
-	if m.API != 1 || len(m.ID) > 100 || !identifier.MatchString(m.ID) || len(m.Name) < 1 || len(m.Name) > 80 || len(m.Description) > 1000 || len(m.Version) > 32 || !semver.MatchString(m.Version) || m.Capability != "url-resolver" {
+	if (m.API != 1 && m.API != 2) || len(m.ID) > 100 || !identifier.MatchString(m.ID) || len(m.Name) < 1 || len(m.Name) > 80 || len(m.Description) > 1000 || len(m.Version) > 32 || !semver.MatchString(m.Version) || m.Capability != "url-resolver" {
 		return errors.New("unsupported add-on manifest, version or capability")
 	}
 	if len(m.ModuleHash) != 64 {
@@ -63,7 +64,14 @@ func (m Manifest) Validate() error {
 	if !validDigest(m.LicenseHash) {
 		return errors.New("invalid license digest")
 	}
-	for _, hosts := range [][]string{m.InputHosts, m.OutputHosts} {
+	if m.API == 1 && len(m.NetworkHosts) > 0 {
+		return errors.New("network permissions require API 2")
+	}
+	lists := [][]string{m.InputHosts, m.OutputHosts}
+	if len(m.NetworkHosts) > 0 {
+		lists = append(lists, m.NetworkHosts)
+	}
+	for _, hosts := range lists {
 		if len(hosts) == 0 || len(hosts) > 16 {
 			return errors.New("declare between 1 and 16 exact hosts")
 		}
