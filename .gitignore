@@ -9,6 +9,8 @@ odm-*.exe
 *.log
 *.conf
 *.session
+__pycache__/
+*.py[cod]
 running.lock/
 
 # Local review evidence; do not publish personal browser/session screenshots.

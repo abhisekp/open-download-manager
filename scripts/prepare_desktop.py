@@ -9,6 +9,8 @@ from desktop_provenance import source_state, write
 root = pathlib.Path(__file__).resolve().parents[1]
 resources = root / 'desktop' / 'resources'
 source = source_state(root)
+if os.environ.get('GITHUB_ACTIONS') == 'true' and source['dirty']:
+    raise RuntimeError('Hosted desktop candidates require an unchanged source checkout; inspect git status before rebuilding')
 (resources / 'backend').mkdir(parents=True, exist_ok=True)
 name = 'odm.exe' if os.name == 'nt' else 'odm'
 subprocess.run(['go', 'build', '-trimpath', '-ldflags=-s -w', '-o', str(resources / 'backend' / name), '.'], cwd=root, check=True)
