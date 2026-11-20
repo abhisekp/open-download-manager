@@ -14,6 +14,7 @@ if len(folders) != 1 or not folders[0].is_dir():
     raise RuntimeError('Expected exactly one packaged native application')
 folder = folders[0]
 metadata = json.loads((root / 'desktop/package.json').read_text())
+hardening = json.loads((folder / 'ODM-HARDENING.json').read_text())
 system = {'win32': 'windows', 'darwin': 'macos', 'linux': 'linux'}[sys.platform]
 arch = {'amd64': 'x64', 'x86_64': 'x64', 'arm64': 'arm64', 'aarch64': 'arm64'}[platform.machine().lower()]
 stem = f'odm-desktop-{metadata["version"]}-{system}-{arch}'
@@ -36,5 +37,6 @@ digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     'electron': metadata['devDependencies']['electron'], 'sha256': digest,
     'artifact': archive.name, 'distribution': 'development-candidate',
     'publisherSigned': False, 'notarized': False,
+    'hardening': hardening,
 }, indent=2) + '\n')
 print('Archived native desktop candidate:', archive.name)

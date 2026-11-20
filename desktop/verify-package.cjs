@@ -31,3 +31,7 @@ for (const name of ['LICENSE', 'LICENSES.chromium.html']) {
 console.log('Native package content verified: exact application sources and licenses; no SDK, tests or development dependencies.');
 // The following argument is for the separate test harness, never the product entry point.
 console.log(resources);
+require('./hardening.cjs').verifyHardening(runtime).then(hardening => {
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(runtime, 'ODM-HARDENING.json'), 'utf8')), hardening);
+  console.log('Native binary fuse settings read back and verified.');
+}).catch(error => { console.error(error.message); process.exitCode = 1; });

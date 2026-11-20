@@ -37,3 +37,12 @@ Native candidates are development artifacts, not published releases or signed in
 Current runtime/security references: [Electron upstream releases](https://github.com/electron/electron/releases), [Electron security guidance](https://www.electronjs.org/docs/latest/tutorial/security), [packager](https://github.com/electron/packager). Architecture availability was checked against Electron 45.4.1 release assets.
 
 macOS is direct download only. Apple Store enrollment, paid Apple Developer membership and Apple notarization are excluded by the owner; do not represent local/ad-hoc bundle signatures as an identified Apple publisher. Windows production publisher signing and Microsoft Store certification remain separate gates.
+## Packaged runtime restrictions
+
+Native packages disable Electron's Node-as-executable mode, NODE_OPTIONS/NODE_EXTRA_CA_CERTS startup overrides, Node inspector arguments and extra file-protocol privileges. They load application code only from app.asar. Embedded ASAR validation is enabled on Windows/macOS, where Electron supports it; Linux retains the explicit lack of that validation. The build requires an explicit setting for every supported fuse and reads the actual executable back before accepting the package.
+
+The source smoke test uses the ordinary development Electron runtime. The separate packaged-executable test sets a harmless owned NODE_OPTIONS preload and ELECTRON_RUN_AS_NODE, then verifies the hardened application still starts as an app and never writes the preload's marker. It also checks isolated rendering, exact transfer bytes, saved state and clean exit. The hardening helper and all other build/test code are excluded from the four-file application archive.
+
+Cookie encryption remains off because this application uses memory-only renderer sessions, not persistent browser cookie storage. The optional custom V8 snapshot is not enabled because it is not in the prebuilt runtime. macOS package-time ad-hoc signature repair permits runtime testing; it is not identified-publisher signing, notarization or Apple Store distribution. Fuses must be applied before any future publisher signature. Binary flags and a sidecar JSON record do not substitute for signed releases, runtime dependency inventory or a trusted updater.
+
+Implementation uses pinned build-only @electron/fuses 2.1.3. Official references: [Electron fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) and [the upstream tool](https://github.com/electron/fuses), checked 2026-11-20.

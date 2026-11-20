@@ -48,7 +48,13 @@ async function run() {
   let child, page, fixture, exited = false, exitCode, phase = 'runtime startup', stderrTail = '';
   const watchdog = setTimeout(() => { console.error('Packaged application test timed out'); child?.kill(); process.exit(1); }, 60000);
   try {
-    child = spawn(executable, ['--data-dir', data, '--downloads', files, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1'], {windowsHide:true,stdio:['ignore','ignore','pipe']});
+    const marker = path.join(scratch, 'node-options-executed');
+    const preload = path.join(scratch, 'owned-environment-probe.cjs');
+    fs.writeFileSync(preload, `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'unexpected startup code');`);
+    child = spawn(executable, ['--data-dir', data, '--downloads', files, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1'], {
+      windowsHide:true,stdio:['ignore','ignore','pipe'],
+      env:{...process.env,ELECTRON_RUN_AS_NODE:'1',NODE_OPTIONS:'--require "'+preload.replaceAll('\\','/')+'"'},
+    });
     const exit = new Promise(resolve => child.once('exit', code => { exited = true; exitCode = code; resolve(); }));
     const port = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Packaged runtime did not expose its test window')), 20000);
@@ -87,6 +93,7 @@ async function run() {
     assert.ok(/^[a-f0-9]{64}$/.test(state.token || ''), 'private application session is ready');
     assert.match(state.text, /Open Download\s+Manager/);
     assert.equal(state.node, 'undefined');
+    assert.equal(fs.existsSync(marker), false, 'packaged runtime ignores NODE_OPTIONS startup injection');
     const headers = {Authorization:'Bearer '+state.token, Origin:state.origin, 'Content-Type':'application/json'};
     const payload = Buffer.from('packaged executable transfer fixture\n'.repeat(4096));
     fixture = http.createServer((_request, reply) => { reply.writeHead(200, {'Content-Length':payload.length}); reply.end(payload); });
@@ -121,7 +128,8 @@ async function run() {
     assert.equal(exitCode, 0);
     assert.equal(fs.existsSync(path.join(data, 'running.lock')), false);
     assert.ok(fs.existsSync(path.join(data, 'http-transfers.json')));
-    console.log('PASS: actual packaged runtime launch, isolated UI, real transfer bytes, saved state and clean exit.');
+    assert.equal(fs.existsSync(marker), false, 'environment preload was never executed');
+    console.log('PASS: actual hardened runtime ignores Node startup options, launches isolated UI, transfers exact bytes, saves state and exits cleanly.');
   } catch (error) {
     throw new Error(phase + ': ' + error.message);
   } finally {

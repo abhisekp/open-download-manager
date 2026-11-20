@@ -24,6 +24,12 @@ packager({
   icon: path.join(resources, platform === 'win32' ? 'odm.ico' : platform === 'darwin' ? 'odm.icns' : 'odm-icon.png'),
   appVersion: require('./package.json').version, appBundleId: 'org.opendownloadmanager.desktop',
   out: path.join(__dirname, 'out'), overwrite: true, asar: true, prune: true,
-  ignore: [/^\/(?:resources|out|node_modules)(?:\/|$)/, /(?:\.test\.cjs|smoke\.cjs|package\.cjs|package-lock\.json)$/],
+  ignore: [/^\/(?:resources|out|node_modules)(?:\/|$)/, /(?:\.test\.cjs|smoke\.cjs|package\.cjs|hardening\.cjs|package-lock\.json)$/],
   extraResource: ['backend', 'odm-icon.png', 'ODM-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt'].map(name => path.join(resources, name)),
-}).then(packages => { for (const folder of packages) console.log(folder); }).catch(error => { console.error(error.message); process.exitCode = 1; });
+}).then(async packages => {
+  for (const folder of packages) {
+    const hardening = await require('./hardening.cjs').harden(folder, platform);
+    fs.writeFileSync(path.join(folder, 'ODM-HARDENING.json'), JSON.stringify(hardening, null, 2) + '\n');
+    console.log(folder);
+  }
+}).catch(error => { console.error(error.message); process.exitCode = 1; });
