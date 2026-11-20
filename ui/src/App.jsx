@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { BrowserConnections } from "./BrowserConnections.jsx";
 import { AddonManager } from "./AddonManager.jsx";
 import { TorrentTrackers } from "./TorrentTrackers.jsx";
+import { HttpQueue } from "./HttpQueue.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -24,6 +25,7 @@ const name = (d) =>
 const status = {
   active: "Downloading",
   waiting: "Queued",
+  scheduled: "Scheduled",
   paused: "Paused",
   complete: "Complete",
   error: "Failed",
@@ -244,7 +246,7 @@ export function App() {
             Verify checksum
           </button>
         )}
-        {["active", "waiting"].includes(d.status) && (
+        {["active", "waiting", "scheduled"].includes(d.status) && (
           <button
             disabled={busy}
             onClick={() => act("control", { gid: d.gid, action: "pause" })}
@@ -288,6 +290,7 @@ export function App() {
           {[
             ["Downloads", "download"],
             ["Torrents", "magnet"],
+            ["Queue & schedules", "calendar-check"],
             ["Extensions", "puzzle"],
             ["Settings", "gear"],
           ].map(([v, i]) => (
@@ -336,6 +339,7 @@ export function App() {
             {notice}
           </div>
         )}
+        {view === "Queue & schedules" && <HttpQueue api={api} refreshDownloads={refresh} />}
         {["Downloads", "Torrents"].includes(view) && (
           <>
             <div className="toolbar">

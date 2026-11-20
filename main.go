@@ -235,6 +235,7 @@ type App struct {
 func (a *App) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/torrent-trackers", a.torrentTrackersAPI)
+	mux.HandleFunc("/api/http-queue", a.httpQueueAPI)
 	mux.HandleFunc("/api/addons", a.addonsAPI)
 	mux.HandleFunc("/api/addons/", a.addonsAPI)
 	mux.HandleFunc("/api/", a.api)

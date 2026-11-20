@@ -4,7 +4,7 @@ ODM is an MIT-licensed development application. Packaging success does not estab
 
 ## Verification
 
-`ci.yml` runs on pushes, pull requests and manual dispatch. It builds the interface, runs Go race tests and security scans, verifies browser extension tests, builds seven portable targets and four Debian packages, checks package contents and SHA-256 digests, and exercises the real download engines on Linux x64. Node 24.11.1 and the Go toolchain in go.mod are installed explicitly. Actions use immutable upstream commit pins.
+`ci.yml` runs on pushes, pull requests and manual dispatch. It builds the interface, runs Go race tests and security scans, verifies browser extension tests, builds nine portable targets and four Debian packages, checks package contents and SHA-256 digests, and exercises the real download engines on Linux x64. Node 24.11.1 and the Go toolchain in go.mod are installed explicitly. Actions use immutable upstream commit pins.
 
 Local workflow validation:
 ```text
@@ -15,7 +15,7 @@ python scripts/verify_artifacts.py --kind portable
 
 ## Release candidate validation
 
-Run **Prepare draft release** with `validation_only=true` (default) and `source_ref=main` or a signed commit SHA. This verifies the approved commit signer, runs quality gates, builds and inspects all 14 portable/Debian/extension archives, and uploads a `release-candidate` artifact. It creates no tag or release.
+Run **Prepare draft release** with `validation_only=true` (default) and `source_ref=main` or a signed commit SHA. This verifies the approved commit signer, runs quality gates, builds and inspects all 16 portable/Debian/extension archives, and uploads a `release-candidate` artifact. It creates no tag or release.
 
 To create a draft, first obtain approval for the exact source/version/artifacts and create the reviewed tag matching `v` plus the root `VERSION` file. Dispatch with `validation_only=false` and that tag. The separate `draft` job requires the configured `release-approval` environment review, verifies that the tag still resolves to the validated SHA, requires successful CI for that exact SHA, downloads the same candidate artifacts and rechecks their digests. It creates an unpublished draft prerelease only. Publishing the draft is a separate approval and operation. Existing drafts fail safely instead of being overwritten.
 
@@ -31,7 +31,7 @@ Both protected environments require reviewer `abhisekp` and allow the initiating
 
 ## Remaining release work
 
-Public GitHub prerelease publication is now an optional, separately approved job, selected with publish_after_review=true outside validation mode. No public binary release or Store submission has been executed. Store identity/account access, certification, signing and clean install/update/uninstall tests remain necessary. Release candidates now generate a CycloneDX 1.6 dependency/artifact inventory, validate it against pinned official schemas, and generate GitHub/Sigstore provenance and SBOM attestations. These records are not executable Authenticode signatures. Windows x64 and Linux x64 have engine test evidence; cross-compilation alone does not verify the other architectures. ZIP, tar.gz, Debian and unsigned MSIX formats are implemented; RPM, AppImage, Flatpak and Snap remain planned.
+Public GitHub prerelease publication is now an optional, separately approved job, selected with publish_after_review=true outside validation mode. The approved v0.1.0-dev prerelease is public; later 0.2.0-dev source is not included. No Microsoft Store application submission has been executed. Store identity/account access, certification, signing and clean install/update/uninstall tests remain necessary. Release candidates now generate a CycloneDX 1.6 dependency/artifact inventory, validate it against pinned official schemas, and generate GitHub/Sigstore provenance and SBOM attestations. These records are not executable Authenticode signatures. Native Go platform jobs and six packaged desktop runtime jobs have recorded passing checkpoints in VERIFICATION.md. Cross-compilation alone does not verify every target or native installation. ZIP, tar.gz, Debian and unsigned MSIX formats are implemented; RPM, AppImage, Flatpak and Snap remain planned.
 
 Keep secrets out of source and chat. Retain previous packages for a reviewed manual reinstall if necessary; no automatic rollback or credential rotation is performed.
 

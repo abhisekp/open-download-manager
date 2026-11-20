@@ -17,7 +17,7 @@ go build -o odm .
 
 Windows: build with `go build -o odm.exe .` and run `odm.exe`. It opens a browser to an authenticated loopback session. `--no-browser` prints the launch link; treat that link as a local credential and do not share it. `--engine` accepts a full aria2 executable path. `--downloads` selects the download directory. `--data-dir` selects application data. Stop with Ctrl+C to save unfinished transfers; closing the browser leaves the app running. OS-backed data locking prevents concurrent ownership and recovers after abrupt termination. Legacy releases without an ownership marker are rejected conservatively; stop the old release before clearing its legacy lock.
 
-Portable archives under `dist/` contain the application, not aria2. The basic HTTP/HTTPS and torrent engines are built in; optional engine installation adds other protocols and accelerated transfer features. Linux needs a browser and `xdg-open`, or open the printed link manually. There is no desktop shortcut/tray/native window yet.
+Portable archives under `dist/` contain the application, not aria2. HTTP/HTTPS and torrents are built in. Portable browser-interface builds need a browser (`xdg-open` on Linux), or the launch link can be opened manually. Separate native window/tray candidates are built for Windows, Linux and macOS x64/ARM64; native installers and updates remain pending.
 
 ## Current behavior
 
@@ -29,6 +29,7 @@ Portable archives under `dist/` contain the application, not aria2. The basic HT
 - Preserve up to 500 terminal transfer records locally across graceful restarts.
 - Persist a download speed limit for native HTTP and the optional aria2 engine; native torrent limits are not exposed yet. Each engine enforces its own limit rather than a shared application-wide budget.
 - Save unfinished transfer sessions every ten seconds and on graceful shutdown.
+- Use **Queue & schedules** for persisted native HTTP order, 1–8 active / 1–3 per-host limits and one-time local-time starts. Unstarted schedules remain armed across restarts; paused schedules do not fire. ODM must be running; see [queue behavior](docs/QUEUE.md).
 - Pair a browser extension with a dedicated, revocable link-submission token. See [browser integration](docs/BROWSERS.md) for packages and current marketplace limitations.
 - Fetch/copy a live tracker list, then separately review and add chosen URLs to a public native torrent. Private torrents and magnets awaiting metadata cannot receive additions. Tracker removal/replacement remains open; see [native torrent controls](docs/NATIVE-TORRENTS.md).
 - Install signed local URL-resolver add-ons, review exact host permissions, enable/disable them, and review suggested links before downloading. Modules run in isolated WASI workers; see the [SDK](sdk/README.md) for the contract and remaining limits.

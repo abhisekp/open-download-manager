@@ -66,6 +66,7 @@ jobs:
           python3 scripts/native_mode_test.py --exe /tmp/odm
           python3 scripts/addons_test.py --exe /tmp/odm --native-http
           python3 scripts/lock_recovery_test.py --exe /tmp/odm
+          python3 scripts/queue_integration.py --exe /tmp/odm
           python3 scripts/degraded_engine_test.py --exe /tmp/odm
       - name: Install, launch and uninstall Debian package
         run: bash scripts/linux_install_test.sh
@@ -123,4 +124,5 @@ jobs:
           go build -o odm-runtime.exe .
           python scripts/native_mode_test.py --exe odm-runtime.exe
           python scripts/lock_recovery_test.py --exe odm-runtime.exe
+          python scripts/queue_integration.py --exe odm-runtime.exe
           python scripts/degraded_engine_test.py --exe odm-runtime.exe

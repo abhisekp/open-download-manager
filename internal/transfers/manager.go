@@ -36,13 +36,16 @@ type Job struct {
 	Modified  string `json:"last_modified"`
 	Error     string `json:"error"`
 	Created   int64  `json:"created"`
+	Order     int    `json:"order,omitempty"`
+	StartAt   int64  `json:"startAt,omitempty"`
 	Speed     int64  `json:"-"`
 }
 
 type state struct {
-	Version int    `json:"version"`
-	Limit   uint64 `json:"limit"`
-	Jobs    []Job  `json:"jobs"`
+	Version int           `json:"version"`
+	Limit   uint64        `json:"limit"`
+	Jobs    []Job         `json:"jobs"`
+	Queue   QueueSettings `json:"queue,omitempty"`
 }
 type Config struct {
 	DataDir, Downloads string
@@ -66,6 +69,7 @@ type Manager struct {
 	closeDone     chan struct{}
 	closeErr      error
 	stallTimeout  time.Duration
+	queue         QueueSettings
 }
 
 func validURL(raw string) bool {
@@ -116,6 +120,7 @@ func Open(config Config) (*Manager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{root: root, dir: config.Downloads, registry: filepath.Join(config.DataDir, "http-transfers.json"), jobs: map[string]*Job{}, running: map[string]context.CancelFunc{}, limiter: rate.NewLimiter(rate.Inf, 32768), ctx: ctx, cancel: cancel, schedulerDone: make(chan struct{})}
 	m.closeDone = make(chan struct{})
+	m.queue = QueueSettings{Concurrent: 3, PerHost: 3}
 	m.stallTimeout = config.StallTimeout
 	if m.stallTimeout <= 0 {
 		m.stallTimeout = 30 * time.Second
@@ -155,11 +160,15 @@ func Open(config Config) (*Manager, error) {
 			return fail(errors.New("invalid native HTTP registry"))
 		}
 		for _, job := range stored.Jobs {
-			if !validID(job.ID) || !validURL(job.URL) || safeName(job.Name) != job.Name || job.Total < 0 || job.Completed < 0 || job.Committed < 0 || job.Committed > job.Completed || m.jobs[job.ID] != nil {
+			if !validID(job.ID) || !validURL(job.URL) || safeName(job.Name) != job.Name || job.Total < 0 || job.Completed < 0 || job.Committed < 0 || job.Committed > job.Completed || job.Order < 0 || job.Order > 200 || job.StartAt < 0 || job.StartAt > 253402300799000 || m.jobs[job.ID] != nil {
 				return fail(errors.New("invalid native HTTP task"))
 			}
 			switch job.Status {
 			case "complete", "error", "removed", "paused":
+			case "scheduled":
+				if job.StartAt == 0 {
+					return fail(errors.New("scheduled transfer has no start time"))
+				}
 			case "active", "waiting":
 				job.Status = "paused"
 			case "finalizing":
@@ -170,6 +179,12 @@ func Open(config Config) (*Manager, error) {
 			m.jobs[job.ID] = &copy
 		}
 		m.applyLimit(stored.Limit)
+		if stored.Queue != (QueueSettings{}) {
+			if !stored.Queue.valid() {
+				return fail(errors.New("invalid native HTTP queue settings"))
+			}
+			m.queue = stored.Queue
+		}
 		if err = file.Close(); err != nil {
 			return fail(err)
 		}
@@ -193,11 +208,19 @@ func (m *Manager) snapshot() []Job {
 	for _, job := range m.jobs {
 		rows = append(rows, *job)
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Created < rows[j].Created })
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Order != rows[j].Order {
+			return rows[i].Order < rows[j].Order
+		}
+		if rows[i].Created != rows[j].Created {
+			return rows[i].Created < rows[j].Created
+		}
+		return rows[i].ID < rows[j].ID
+	})
 	return rows
 }
 func (m *Manager) save() error {
-	body, err := json.Marshal(state{Version: 1, Limit: m.limit, Jobs: m.snapshot()})
+	body, err := json.Marshal(state{Version: 1, Limit: m.limit, Jobs: m.snapshot(), Queue: m.queue})
 	if err != nil {
 		return err
 	}
@@ -251,8 +274,17 @@ func (m *Manager) SetLimit(limit uint64) error {
 	return nil
 }
 func (m *Manager) Add(raw string) (string, error) {
+	return m.AddPlanned(raw, 0)
+}
+
+// AddPlanned persists a one-time schedule before it becomes runnable. A zero
+// timestamp queues immediately; a future timestamp is milliseconds since Unix epoch.
+func (m *Manager) AddPlanned(raw string, startAt int64) (string, error) {
 	if !validURL(raw) {
 		return "", errors.New("use an HTTP or HTTPS URL without embedded credentials")
+	}
+	if startAt != 0 && (startAt <= time.Now().UnixMilli() || startAt > time.Now().AddDate(1, 0, 0).UnixMilli()) {
+		return "", errors.New("choose a future start time within one year")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -282,9 +314,22 @@ func (m *Manager) Add(raw string) (string, error) {
 	if err = file.Close(); err != nil {
 		return "", err
 	}
-	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: "waiting", Created: time.Now().UnixNano()}
+	status := "waiting"
+	if startAt != 0 {
+		status = "scheduled"
+	}
+	// Keep newly added jobs after the user's existing ordered jobs.
+	previousOrders := map[string]int{}
+	for i, row := range m.snapshot() {
+		previousOrders[row.ID] = row.Order
+		m.jobs[row.ID].Order = i + 1
+	}
+	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: status, Created: time.Now().UnixNano(), Order: len(m.jobs) + 1, StartAt: startAt}
 	if err = m.save(); err != nil {
 		delete(m.jobs, id)
+		for key, order := range previousOrders {
+			m.jobs[key].Order = order
+		}
 		_ = m.root.Remove(partial(id))
 		return "", err
 	}
@@ -315,6 +360,7 @@ func (m *Manager) Control(id, action string) error {
 		}
 		job.Status = "waiting"
 		job.Error = ""
+		job.StartAt = 0
 	case "remove":
 		if job.Status == "finalizing" {
 			return errors.New("transfer is finalizing")
@@ -350,11 +396,18 @@ func (m *Manager) schedule() {
 			return
 		case <-ticker.C:
 			m.mu.Lock()
+			hosts := map[string]int{}
+			for id := range m.running {
+				if job := m.jobs[id]; job != nil {
+					hosts[queueHost(job.URL)]++
+				}
+			}
 			for _, row := range m.snapshot() {
-				if len(m.running) >= 3 {
+				if len(m.running) >= m.queue.Concurrent {
 					break
 				}
-				if row.Status != "waiting" || m.running[row.ID] != nil {
+				ready := row.Status == "waiting" || row.Status == "scheduled" && row.StartAt <= time.Now().UnixMilli()
+				if !ready || m.running[row.ID] != nil || hosts[queueHost(row.URL)] >= m.queue.PerHost {
 					continue
 				}
 				job := m.jobs[row.ID]
@@ -368,6 +421,7 @@ func (m *Manager) schedule() {
 					cancel()
 					continue
 				}
+				hosts[queueHost(row.URL)]++
 				m.wg.Add(1)
 				go m.run(ctx, row.ID)
 			}

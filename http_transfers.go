@@ -104,7 +104,7 @@ func (e *Engine) mergeHTTP(method string, raw json.RawMessage) json.RawMessage {
 		var rows []json.RawMessage
 		_ = json.Unmarshal(raw, &rows)
 		for _, job := range e.HTTP.Jobs() {
-			matches := method == "tellActive" && (job.Status == "active" || job.Status == "finalizing") || method == "tellWaiting" && (job.Status == "waiting" || job.Status == "paused") || method == "tellStopped" && (job.Status == "complete" || job.Status == "removed" || job.Status == "error")
+			matches := method == "tellActive" && (job.Status == "active" || job.Status == "finalizing") || method == "tellWaiting" && (job.Status == "waiting" || job.Status == "paused" || job.Status == "scheduled") || method == "tellStopped" && (job.Status == "complete" || job.Status == "removed" || job.Status == "error")
 			if matches {
 				rows = append(rows, e.httpRow(job))
 			}
