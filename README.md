@@ -26,8 +26,8 @@ Portable archives under `dist/` contain the application, not aria2. HTTP/HTTPS a
 - View progress, speed, connections and transfer states; pause, resume, remove, search, and filter torrents.
 - Import up to 50 newline-separated links with duplicate removal and per-link results.
 - Verify the first file of a completed transfer against an expected SHA-256 checksum (up to 1 GiB).
-- Preserve up to 500 terminal transfer records locally across graceful restarts.
-- Persist a download speed limit for native HTTP and the optional aria2 engine; native torrent limits are not exposed yet. Each engine enforces its own limit rather than a shared application-wide budget.
+- Preserve up to 500 terminal transfer records locally and export reviewed JSON history with sensitive source links and paths excluded by default. See [history](docs/HISTORY.md).
+- Persist separate native torrent download/upload caps and a native HTTP/optional aria2 download limit. Existing torrent peers and webseeds observe live changes; each engine enforces its own budget. See [torrent bandwidth](docs/TORRENT-BANDWIDTH.md).
 - Save unfinished transfer sessions every ten seconds and on graceful shutdown.
 - Use **Queue & schedules** for persisted native HTTP order, 1–8 active / 1–3 per-host limits and one-time local-time starts. Unstarted schedules remain armed across restarts; paused schedules do not fire. ODM must be running; see [queue behavior](docs/QUEUE.md).
 - Pair a browser extension with a dedicated, revocable link-submission token. See [browser integration](docs/BROWSERS.md) for packages and current marketplace limitations.

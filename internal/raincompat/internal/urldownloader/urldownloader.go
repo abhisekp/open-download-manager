@@ -10,17 +10,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/rain/v2/internal/bandwidth"
 	"github.com/cenkalti/rain/v2/internal/bufferpool"
 	"github.com/cenkalti/rain/v2/internal/ctxutil"
 	"github.com/cenkalti/rain/v2/internal/piece"
-	"github.com/juju/ratelimit"
 )
 
 // URLDownloader downloads files from a HTTP source.
 type URLDownloader struct {
 	URL                 string
 	Begin, End, current uint32 // piece index
-	bucket              *ratelimit.Bucket
+	bucket              *bandwidth.Limiter
 	closeC, doneC       chan struct{}
 }
 
@@ -34,7 +34,7 @@ type PieceResult struct {
 }
 
 // New returns a new URLDownloader for the given source and piece range.
-func New(source string, begin, end uint32, b *ratelimit.Bucket) *URLDownloader {
+func New(source string, begin, end uint32, b *bandwidth.Limiter) *URLDownloader {
 	return &URLDownloader{
 		URL:     source,
 		Begin:   begin,
@@ -145,14 +145,14 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 		var m int64 // position in response
 		for m < job.Length {
 			readSize := calcReadSize(buf, n, job, m)
+			// Deliberate bandwidth waits are not a stalled network read.
+			timer.Stop()
 			if d.bucket != nil {
-				waitDuration := d.bucket.Take(readSize)
-				select {
-				case <-time.After(waitDuration):
-				case <-d.closeC:
+				if d.bucket.Wait(d.closeC, readSize) != nil {
 					return false
 				}
 			}
+			timer.Reset(readTimeout)
 			o, err := readFull(resp.Body, buf.Data[n:int64(n)+readSize], timer, readTimeout)
 			if err != nil {
 				d.sendResult(resultC, &PieceResult{Downloader: d, Error: err})

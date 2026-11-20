@@ -57,7 +57,7 @@ func waitNative(t *testing.T, tor *rain.Torrent) {
 func TestNativeTorrentLocalPeerAndPersistence(t *testing.T) {
 	payload := bytes.Repeat([]byte("ODM native torrent fixture\n"), 6000)
 	metadata, hash := fixtureTorrent(t, "native-fixture.bin", payload)
-	seedRoot := t.TempDir()
+	seedRoot := ownedTestDir(t)
 	seed, e := newNativeTorrents(seedRoot, filepath.Join(seedRoot, "files"), "127.0.0.1")
 	if e != nil {
 		t.Fatal(e)
@@ -76,7 +76,7 @@ func TestNativeTorrentLocalPeerAndPersistence(t *testing.T) {
 		t.Fatal(e)
 	}
 	waitNative(t, seeder)
-	root := t.TempDir()
+	root := ownedTestDir(t)
 	downloads := filepath.Join(root, "files")
 	native, e := newNativeTorrents(root, downloads, "127.0.0.1")
 	if e != nil {
@@ -88,7 +88,7 @@ func TestNativeTorrentLocalPeerAndPersistence(t *testing.T) {
 			native.Close()
 		}
 	}()
-	raw, e := native.addURI("magnet:?xt=urn:btih:" + hash + "&dn=native-fixture.bin&x.pe=" + url.QueryEscape("127.0.0.1:"+strconv.Itoa(seeder.Port())))
+	raw, e := native.addURI("magnet:?xt=urn:btih:" + hash + "&dn=native-fixture.bin&x.pe=" + url.QueryEscape("127.0.0.1:"+strconv.Itoa(seeder.Stats().Port)))
 	if e != nil {
 		t.Fatal(e)
 	}

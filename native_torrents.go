@@ -21,10 +21,12 @@ import (
 
 // Native BitTorrent runs in-process. It does not send torrent operations to aria2.
 type NativeTorrents struct {
-	mu       sync.Mutex
-	session  *rain.Session
-	closed   bool
-	closeErr error
+	mu        sync.Mutex
+	session   *rain.Session
+	closed    bool
+	closeErr  error
+	limitFile string
+	limits    TorrentLimits
 }
 
 var nativeLogInitialization sync.Once
@@ -55,6 +57,13 @@ func newNativeTorrents(data, downloads, host string) (*NativeTorrents, error) {
 		return nil, err
 	}
 	cfg.DataDir = downloads
+	limitFile := filepath.Join(data, "torrent-limits.json")
+	limits, err := loadTorrentLimits(limitFile)
+	if err != nil {
+		return nil, err
+	}
+	cfg.SpeedLimitDownload = limits.DownloadKiB
+	cfg.SpeedLimitUpload = limits.UploadKiB
 	cfg.Host = host
 	cfg.RPCEnabled = false
 	cfg.DHTEnabled = false
@@ -86,7 +95,7 @@ func newNativeTorrents(data, downloads, host string) (*NativeTorrents, error) {
 	if e != nil {
 		return nil, e
 	}
-	return &NativeTorrents{session: session}, nil
+	return &NativeTorrents{session: session, limitFile: limitFile, limits: limits}, nil
 }
 func (n *NativeTorrents) Close() error {
 	n.mu.Lock()

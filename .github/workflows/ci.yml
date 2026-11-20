@@ -46,7 +46,7 @@ jobs:
           go test -race ./...
           go test -race -run TestNativeTrackerConcurrentDedupAndRemoval -count=25 .
           (cd internal/nettoolscompat && go test -race ./...)
-          (cd internal/raincompat && go test -race ./internal/announcer)
+          (cd internal/raincompat && go test -race ./internal/announcer ./internal/bandwidth ./internal/urldownloader)
           go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
           npm audit --prefix ui --omit=dev --audit-level=high
       - name: Cross compile portable targets
@@ -74,6 +74,7 @@ jobs:
           python3 scripts/segmented_integration.py --exe /tmp/odm
           python3 scripts/retry_integration.py --exe /tmp/odm
           python3 scripts/degraded_engine_test.py --exe /tmp/odm
+          python3 scripts/degraded_engine_test.py --exe /tmp/odm --limits-only
       - name: Install, launch and uninstall Debian package
         run: bash scripts/linux_install_test.sh
       - name: Exercise Linux x86 and emulated ARMv7 binaries
@@ -127,7 +128,7 @@ jobs:
           npm ci --prefix ui --ignore-scripts
           npm run build --prefix ui
           go test ./...
-          (cd internal/raincompat && go test ./internal/announcer)
+          (cd internal/raincompat && go test ./internal/announcer ./internal/bandwidth ./internal/urldownloader)
           go build -o odm-runtime.exe .
           python scripts/native_mode_test.py --exe odm-runtime.exe
           python scripts/lock_recovery_test.py --exe odm-runtime.exe
@@ -135,6 +136,7 @@ jobs:
           python scripts/segmented_integration.py --exe odm-runtime.exe
           python scripts/retry_integration.py --exe odm-runtime.exe
           python scripts/degraded_engine_test.py --exe odm-runtime.exe
+          python scripts/degraded_engine_test.py --exe odm-runtime.exe --limits-only
       - name: Install private Linux credential test dependencies
         if: runner.os == 'Linux'
         run: |

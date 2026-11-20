@@ -12,6 +12,7 @@ import urllib.request
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--exe', required=True)
+parser.add_argument('--limits-only', action='store_true')
 args = parser.parse_args()
 payload = b'original engine isolation fixture'
 
@@ -32,7 +33,10 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
     data = root / 'data'
     (data / 'addons').mkdir(parents=True)
     original_db = b'original deliberately corrupt database fixture' * 256
-    (data / 'torrents.db').write_bytes(original_db)
+    if args.limits_only:
+        (data / 'torrent-limits.json').write_text('invalid torrent bandwidth fixture')
+    else:
+        (data / 'torrents.db').write_bytes(original_db)
     (data / 'addons/registry.json').write_text('invalid add-on registry fixture')
     (data / 'history.json').write_text('invalid history fixture')
     (data / 'appearance.json').write_text('invalid appearance fixture')
@@ -66,7 +70,15 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
             raise AssertionError('Corrupt add-on registry treated as healthy')
         except urllib.error.HTTPError as error:
             assert error.code == 503
-        assert (data / 'torrents.db').read_bytes() == original_db
+        if args.limits_only:
+            assert (data / 'torrent-limits.json').read_text() == 'invalid torrent bandwidth fixture'
+            try:
+                api('torrent-limits')
+                raise AssertionError('Corrupt limits treated as healthy')
+            except urllib.error.HTTPError as error:
+                assert error.code == 503
+        else:
+            assert (data / 'torrents.db').read_bytes() == original_db
         assert (data / 'addons/registry.json').read_text() == 'invalid add-on registry fixture'
         for route in ['history-export','preferences']:
             try:
@@ -76,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
                 assert error.code == 503
         assert (data / 'history.json').read_text() == 'invalid history fixture'
         assert (data / 'appearance.json').read_text() == 'invalid appearance fixture'
-        print('PASS: HTTP works with corrupt torrent/add-on/history/appearance state; original component data retained and failures reported')
+        print('PASS: HTTP works with corrupt optional state; original component data retained and failures reported; limits-only=' + str(args.limits_only))
     finally:
         api('quit', {})
         child.wait(timeout=20)

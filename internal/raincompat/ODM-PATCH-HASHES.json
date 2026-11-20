@@ -1,6 +1,16 @@
 {
-  "go.mod": "26fdaa2d016cb75bf05a84381a04e86df621ae0583a4a0242fbf84851a0463f8",
-  "go.sum": "9f33209b13cfabc0fbb163c99a18a220af872d36b5c6da14f8b44b0813ad1dfd",
+  "go.mod": "036eff7108e6d7634844657c55cd3c9f849967fb470153566dbbf1f33f1a13c4",
+  "go.sum": "7228f0f086ccc21b7e7a43c9fa79c221067d768a12cba1c9045b28f16a5a99c8",
+  "internal/announcer/odm_shutdown_test.go": "ba2a6e9abca491aede85936027d4a3d6f0c9719113b86cc56e37d95459530ee1",
   "internal/announcer/periodic.go": "4ccd3ad511541b638511e31151663cfbe450cde1e9af77eb0c1efe732ecec9d0",
-  "internal/announcer/odm_shutdown_test.go": "ba2a6e9abca491aede85936027d4a3d6f0c9719113b86cc56e37d95459530ee1"
+  "internal/bandwidth/limiter.go": "2af11cc195ddd20f437cf2b632364feab24f71c2bb329b0a9a6f50e984f9db5a",
+  "internal/bandwidth/limiter_test.go": "d3ca4491f7b5ae170acb9243feaa1e5be6cfaab16dfd213a0ab66df12f148679",
+  "internal/peer/peer.go": "4c47da815a3d5f84419e2ce49eae895fd10801731698cc8ca27948a6fed0cbfa",
+  "internal/peerconn/peerconn.go": "de7cc0358cd4e7df15c34435f0375be875d82dd9d2d9a40d1f7ed0b289502ccb",
+  "internal/peerconn/peerreader/peerreader.go": "8c92666c86a590144214f323329be84876edb9315938da67dcf51da37bd5af95",
+  "internal/peerconn/peerwriter/peerwriter.go": "cef2edd5617592ecb4b659ece6183f7986c495fa3957885d6135f7ba4c56213e",
+  "internal/urldownloader/odm_bandwidth_test.go": "3c22e04c9f60bd619ea520aeb97877f5ba3a9c181efa83515e0e846ef1bb206f",
+  "internal/urldownloader/urldownloader.go": "93fd90927e51c147deea1b016391f4651cee9726899f31107b360aa8883a3cf0",
+  "torrent/odm_bandwidth.go": "0b40e8f2a8c63c90c4f06b9f484a9cd401aa12e800d1333194d6b193a6bdab52",
+  "torrent/session.go": "e9ed9b64a9eddd13ad12c390b00ed9566079dd84496b9abd1f4778a2427a7ce7"
 }

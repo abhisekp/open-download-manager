@@ -4,15 +4,15 @@ The target is an independent IDM/FDM/MDM-style desktop download manager with a f
 
 | Capability | Current milestone | Next acceptance gate |
 |---|---|---|
-| HTTP transfers | Native segmented/single-stream transfers, HTTPS Basic OS-keyring accounts, bounded automatic retries with durable backoff, queue fairness and crash recovery | New retry platform acceptance, wider disk/origin/CDN/proxy and authentication coverage |
+| HTTP transfers | Native segmented/single-stream transfers, HTTPS Basic OS-keyring accounts, bounded automatic retries with durable backoff, queue fairness and crash recovery | Wider disk/origin/CDN/proxy and authentication coverage |
 | Parallel transfer/resume | Three fixed native ranges for strong-validator resources ≥8 MiB, per-range crash checkpoints, safe changed-resource fallback and single-connection choice; optional aria2 parallel transfers | Dynamic splitting, mirrors and broader origin/CDN/platform compatibility |
-| Torrents/magnets | Native Rain integration, metadata import, local peer transfer, persistence and permission-gated public tracker additions | File selection, priorities, tracker removal/replacement, upload limits and public/private swarm matrix |
+| Torrents/magnets | Native Rain integration, metadata import, local peer transfer, persistence, permission-gated public tracker additions and live shared download/upload caps | File selection, priorities, tracker removal/replacement, seeding policies and public/private swarm matrix |
 | FTP/SFTP | Engine URI path accepted | Real protocol/authentication tests and credential storage design |
 | Queue | Persisted native HTTP ordering, concurrency/per-source-host limits, pause/resume and batch import | Unified torrent/aria2 queue groups and richer queue policies |
 | Scheduling | Persisted one-time native HTTP UTC starts with local-time UI, paused/overdue/crash recovery and real byte verification | Recurring windows, torrent/aria2 schedules and OS wake integration |
-| Speed controls | Persisted native HTTP and optional aria2 download limits, enforced separately | Native torrent download/upload limits, traffic modes and a shared application-wide budget |
+| Speed controls | Persisted native HTTP/optional aria2 download limits and native torrent download/upload caps, enforced separately | Traffic modes and a shared application-wide budget |
 | File management | Startup destination, retain files on removal, first-file SHA-256 verification | Categories, safe rename, move, collision and disk-full handling |
-| History | Bounded durable history with recorded-time eviction, failed-write rollback, active-transfer protection and consented local JSON export with sensitive details excluded by default | Hosted acceptance, age-based retention policy UI, reviewed restore/import and crash window reduction |
+| History | Bounded durable history with recorded-time eviction, failed-write rollback, active-transfer protection and consented local JSON export with sensitive details excluded by default | Age-based retention policy UI, reviewed restore/import and crash window reduction |
 | Browser integration | Paired bridge; installed Firefox/Chrome/Edge tests pass; Firefox submitted awaiting review; Edge submitted In review; Safari source | Store review, signed marketplace install tests, native messaging and installer-assisted handoff; Chrome registration payment blocked |
 | Native desktop | Native window/tray, single instance, explicit background action and actual packaged runtime/transfer/quit tests on six x64/ARM64 targets | Native installer/update/uninstall integration, accessibility and notifications; 32-bit targets retain browser UI |
 | Media extraction | Not implemented | Explicit provider adapters, rights review, safe dependency management |
@@ -23,7 +23,7 @@ The target is an independent IDM/FDM/MDM-style desktop download manager with a f
 | Debrid and provider accounts | Not implemented | Explicit provider adapters, secure credential storage, quota/error handling and paid account use only when owner-authorized |
 | Archives and IDM import | Not implemented | Safe opt-in extraction with traversal/link/size safeguards; reviewed import with sensitive URL/referrer/cookie handling and rollback |
 | Network controls | Native transport safety and system transport defaults | User-managed proxy/DNS/adapter settings, credential handling and disconnect/leakage checks |
-| Themes, localization and accessibility | Approved layout with persistent light/dark/system choices, live system updates, color tokens and reduced-motion preferences; semantic controls and basic focus containment | Platform appearance acceptance, translated messages/RTL, complete keyboard and screen-reader journeys |
+| Themes, localization and accessibility | Approved layout with persistent light/dark/system choices, live system updates, color tokens and reduced-motion preferences; semantic controls and basic focus containment | Translated messages/RTL, complete keyboard and screen-reader journeys |
 | Diagnostics and CLI | Startup flags, local authenticated UI API; no automatic reports | User-reviewed redacted reports, stable versioned CLI/JSON contract and support/restore guidance |
 | Remote MCP | Design only | User-bound API keys, hosted TLS, isolation and real client tests |
 | Store/installers | Release preparation | Engine bundle/license review, MSIX identity, signing and clean installs |

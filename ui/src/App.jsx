@@ -6,6 +6,7 @@ import { HttpQueue } from "./HttpQueue.jsx";
 import { SavedLogins } from "./SavedLogins.jsx";
 import { useAppearance, AppearanceSettings } from "./Appearance.jsx";
 import { HistoryExport } from "./HistoryExport.jsx";
+import { TorrentLimits } from "./TorrentLimits.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -616,6 +617,7 @@ export function App() {
             <BrowserConnections api={api} />
             <SavedLogins api={api} />
             <HistoryExport api={api} />
+            <TorrentLimits api={api} />
             <label className="field">
               HTTP/FTP/SFTP download limit (bytes per second)
               <input
