@@ -195,10 +195,11 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				observation := history.observation()
 				if raw, e := engine.Call(ctx, "tellStopped", 0, 1000); e == nil {
 					var rows []json.RawMessage
 					_ = json.Unmarshal(raw, &rows)
-					if _, e = history.merge(rows); e != nil {
+					if _, e = history.mergeObserved(rows, observation); e != nil && !errors.Is(e, errHistoryObservationStale) {
 						log.Print("Unable to save completed history")
 					}
 				}
@@ -210,10 +211,11 @@ func main() {
 		<-ctx.Done()
 		c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		observation := history.observation()
 		if raw, e := engine.Call(c, "tellStopped", 0, 1000); e == nil {
 			var rows []json.RawMessage
 			_ = json.Unmarshal(raw, &rows)
-			_, _ = history.merge(rows)
+			_, _ = history.mergeObserved(rows, observation)
 		}
 		_, _ = engine.Call(c, "saveSession")
 		_, _ = engine.Call(c, "shutdown")
@@ -303,6 +305,7 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		switch r.URL.Path {
 		case "/api/status":
+			observation := a.history.observation()
 			var all []json.RawMessage
 			for _, q := range []struct {
 				name   string
@@ -328,8 +331,8 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 			if a.history == nil {
 				warnings = append(warnings, "Saved history is unavailable. Original history data was retained; current downloads remain available.")
 			}
-			all, historyErr = a.history.merge(all)
-			if historyErr != nil {
+			all, historyErr = a.history.mergeObserved(all, observation)
+			if historyErr != nil && !errors.Is(historyErr, errHistoryObservationStale) {
 				warnings = append(warnings, "History could not be saved. Current downloads remain available; check app data folder access.")
 			}
 			stats, _ := a.engine.Call(r.Context(), "getGlobalStat")

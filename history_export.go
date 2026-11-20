@@ -151,13 +151,18 @@ func (a *App) historyExportAPI(w http.ResponseWriter, r *http.Request) {
 	// A just-completed transfer may precede the periodic history flush. Refresh
 	// available engine records before taking the saved-history export snapshot.
 	if a.engine != nil {
+		observation := a.history.observation()
 		if raw, refreshErr := a.engine.Call(r.Context(), "tellStopped", 0, 1000); refreshErr == nil {
 			var rows []json.RawMessage
 			if json.Unmarshal(raw, &rows) != nil {
 				http.Error(w, "current history could not be read safely", 503)
 				return
 			}
-			if _, refreshErr = a.history.merge(rows); refreshErr != nil {
+			if _, refreshErr = a.history.mergeObserved(rows, observation); refreshErr != nil {
+				if errors.Is(refreshErr, errHistoryObservationStale) {
+					http.Error(w, "History changed during export; review and retry", 409)
+					return
+				}
 				http.Error(w, "history could not be saved before export; check app data folder access", 503)
 				return
 			}

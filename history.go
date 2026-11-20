@@ -9,16 +9,34 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Bounded local history stores terminal engine records; unfinished jobs remain in aria2's session.
 type History struct {
-	mu        sync.Mutex
-	path      string
-	rows      map[string]json.RawMessage
-	forgotten map[string]bool
+	mu         sync.Mutex
+	path       string
+	rows       map[string]json.RawMessage
+	forgotten  map[string]bool
+	generation uint64
+}
+
+var errHistoryObservationStale = errors.New("history changed while reading engine results")
+
+const maxForgottenHistory = 10000
+
+type historyState struct {
+	Version   int                        `json:"version"`
+	Rows      map[string]json.RawMessage `json:"records"`
+	Forgotten map[string]bool            `json:"forgotten"`
+}
+
+func validHistoryID(id string) bool {
+	return id != "" && len(id) <= 128 && utf8.ValidString(id) && strings.IndexFunc(id, unicode.IsControl) < 0
 }
 
 func openHistory(path string) (*History, error) {
@@ -46,15 +64,37 @@ func openHistory(path string) (*History, error) {
 	if len(b) > 16<<20 {
 		return nil, errors.New("history exceeds supported size")
 	}
-	if e = json.Unmarshal(b, &h.rows); e != nil {
+	var shape map[string]json.RawMessage
+	if !utf8.Valid(b) || json.Unmarshal(b, &shape) != nil || shape == nil {
 		return nil, errors.New("history is corrupt; preserve it before recovery")
 	}
-	if h.rows == nil {
-		h.rows = map[string]json.RawMessage{}
+	// Read the original row-map format; migrate only on the next successful
+	// atomic write. An object-valued legacy GID named "version" remains valid.
+	if raw, exists := shape["version"]; exists && !bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
+		var state historyState
+		d := json.NewDecoder(bytes.NewReader(b))
+		d.DisallowUnknownFields()
+		if d.Decode(&state) != nil || state.Version != 2 || state.Rows == nil || state.Forgotten == nil {
+			return nil, errors.New("unsupported history state; original retained")
+		}
+		h.rows = state.Rows
+		if state.Forgotten != nil {
+			h.forgotten = state.Forgotten
+		}
+	} else {
+		h.rows = shape
+	}
+	if len(h.rows) > 500 || len(h.forgotten) > maxForgottenHistory {
+		return nil, errors.New("history record limit exceeded; original retained")
+	}
+	for gid, hidden := range h.forgotten {
+		if !validHistoryID(gid) || !hidden || h.rows[gid] != nil {
+			return nil, errors.New("invalid hidden-history record; original retained")
+		}
 	}
 	for gid, raw := range h.rows {
 		var row struct{ GID, Status string }
-		if json.Unmarshal(raw, &row) != nil || row.GID != gid || gid == "" || (row.Status != "complete" && row.Status != "error" && row.Status != "removed") {
+		if json.Unmarshal(raw, &row) != nil || row.GID != gid || !validHistoryID(gid) || !terminalHistoryStatus(row.Status) {
 			return nil, errors.New("invalid history record; preserve history before recovery")
 		}
 		if at := historyRecordedAt(raw); at < 0 || at > 253402300799000 {
@@ -64,6 +104,9 @@ func openHistory(path string) (*History, error) {
 	return h, nil
 }
 func (h *History) write() error {
+	if len(h.forgotten) > maxForgottenHistory {
+		return errors.New("hidden-history limit reached; saved records kept")
+	}
 	keys := make([]string, 0, len(h.rows))
 	for k := range h.rows {
 		keys = append(keys, k)
@@ -76,7 +119,7 @@ func (h *History) write() error {
 		delete(h.rows, keys[0])
 		keys = keys[1:]
 	}
-	b, e := json.Marshal(h.rows)
+	b, e := json.Marshal(historyState{Version: 2, Rows: h.rows, Forgotten: h.forgotten})
 	if e != nil {
 		return e
 	}
@@ -107,19 +150,39 @@ func (h *History) write() error {
 	}
 	return os.Rename(tmp, h.path)
 }
+// Capture before requesting engine results, so delayed replies cannot undo a
+// subsequent history mutation. The token is process-local; ownership excludes
+// another ODM process from writing the same data directory.
+func (h *History) observation() uint64 {
+	if h == nil {
+		return 0
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.generation
+}
+
+// merge is for current local values. Asynchronous engine reads must instead
+// capture observation before the read and pass it to mergeObserved.
 func (h *History) merge(current []json.RawMessage) ([]json.RawMessage, error) {
+	return h.mergeObserved(current, h.observation())
+}
+
+func (h *History) mergeObserved(current []json.RawMessage, observation uint64) ([]json.RawMessage, error) {
 	if h == nil {
 		return current, nil
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	before := maps.Clone(h.rows)
+	beforeForgotten := maps.Clone(h.forgotten)
+	fresh := observation == h.generation
 	seen := map[string]bool{}
 	changed := false
 	filtered := make([]json.RawMessage, 0, len(current))
 	for _, raw := range current {
 		var row struct{ GID, Status string }
-		if json.Unmarshal(raw, &row) != nil || row.GID == "" {
+		if json.Unmarshal(raw, &row) != nil || !validHistoryID(row.GID) {
 			continue
 		}
 		if h.forgotten[row.GID] && terminalHistoryStatus(row.Status) {
@@ -127,6 +190,18 @@ func (h *History) merge(current []json.RawMessage) ([]json.RawMessage, error) {
 		}
 		filtered = append(filtered, raw)
 		seen[row.GID] = true
+		if !fresh {
+			continue
+		}
+		if liveHistoryStatus(row.Status) {
+			// A live job with a reused engine ID supersedes its old terminal
+			// record and suppression. Persist this before its next completion.
+			if h.forgotten[row.GID] || h.rows[row.GID] != nil {
+				delete(h.forgotten, row.GID)
+				delete(h.rows, row.GID)
+				changed = true
+			}
+		}
 		if row.Status == "complete" || row.Status == "error" || row.Status == "removed" {
 			var previous struct {
 				Status     string
@@ -164,11 +239,16 @@ func (h *History) merge(current []json.RawMessage) ([]json.RawMessage, error) {
 			current = append(current, raw)
 		}
 	}
+	if !fresh {
+		return current, errHistoryObservationStale
+	}
 	if changed {
 		if e := h.write(); e != nil {
 			h.rows = before
+			h.forgotten = beforeForgotten
 			return current, e
 		}
+		h.generation++
 	}
 	return current, nil
 }
@@ -186,6 +266,12 @@ func (h *History) forget(gid string) error {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if !validHistoryID(gid) {
+		return errors.New("invalid history identifier")
+	}
+	if !h.forgotten[gid] && len(h.forgotten) >= maxForgottenHistory {
+		return errors.New("hidden-history limit reached; saved records kept")
+	}
 	before := maps.Clone(h.rows)
 	forgotten, had := h.forgotten[gid]
 	delete(h.rows, gid)
@@ -199,6 +285,7 @@ func (h *History) forget(gid string) error {
 		}
 		return err
 	}
+	h.generation++
 	return nil
 }
 
@@ -212,4 +299,8 @@ func historyRecordedAt(raw json.RawMessage) int64 {
 
 func terminalHistoryStatus(status string) bool {
 	return status == "complete" || status == "error" || status == "removed"
+}
+
+func liveHistoryStatus(status string) bool {
+	return status == "active" || status == "paused" || status == "waiting" || status == "scheduled" || status == "seeding"
 }
