@@ -24,6 +24,7 @@ Portable archives under `dist/` contain the application, not aria2. HTTP/HTTPS a
 - Download BitTorrent magnets and import `.torrent` files using the in-process MIT-licensed Rain library. Native torrent state is saved in a separate local database.
 - Add HTTP/HTTPS file URLs through the built-in engine when aria2 is absent, or explicitly through Queue & schedules. Native HTTP supports three parallel ranges for suitable files of at least 8 MiB, validated per-range crash checkpoints and a single-connection option. It includes bounded queues, safe collisions, TLS checks, stall cancellation and persisted speed limits. Installed aria2 separately handles its HTTP and FTP/SFTP transfers. See [native HTTP behavior](docs/NATIVE-HTTP.md).
 - View progress, speed, connections and transfer states; pause, resume, remove, search, and filter torrents.
+- Create persistent category labels, assign them to downloads and filter by category. Category changes never move or delete files; see [categories](docs/CATEGORIES.md).
 - Import up to 50 newline-separated links with duplicate removal and per-link results.
 - Verify the first file of a completed transfer against an expected SHA-256 checksum (up to 1 GiB).
 - Preserve up to 500 terminal transfer records locally and export reviewed JSON history with sensitive source links and paths excluded by default. See [history](docs/HISTORY.md).

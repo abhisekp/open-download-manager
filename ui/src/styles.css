@@ -168,6 +168,8 @@ header .primary {
 }
 .toolbar {
   display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
@@ -433,7 +435,8 @@ input[type="checkbox"] {
   font-weight: 600;
 }
 input,
-textarea {
+textarea,
+select {
   border: 1px solid var(--border, #cdd5e1);
   padding: 12px;
   border-radius: 8px;
@@ -442,6 +445,30 @@ textarea {
 .field input {
   width: 100%;
   font-weight: 400;
+}
+.field select {
+  width: min(100%, 320px);
+  font-weight: 400;
+}
+.toolbar select {
+  max-width: 220px;
+}
+.category-manager form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin: 14px 0;
+}
+.category-manager label {
+  display: grid;
+  gap: 8px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.category-manager ul {
+  list-style: none;
+  padding: 0;
 }
 .settings textarea {
   width: 100%;

@@ -8,6 +8,7 @@ import { useAppearance, AppearanceSettings } from "./Appearance.jsx";
 import { HistoryExport } from "./HistoryExport.jsx";
 import { TorrentLimits } from "./TorrentLimits.jsx";
 import { TorrentSeeding } from "./TorrentSeeding.jsx";
+import { CategoriesManager } from "./Categories.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -99,6 +100,17 @@ export function App() {
     [trackers, setTrackers] = useState([]),
     [notice, setNotice] = useState(""),
     [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const categoryState = data.categoryState;
+  useEffect(() => {
+    if (
+      categoryFilter &&
+      categoryFilter !== "uncategorized" &&
+      categoryState &&
+      !categoryState.categories.some((c) => c.id === categoryFilter)
+    )
+      setCategoryFilter("");
+  }, [categoryFilter, categoryState]);
   const [limitLoaded, setLimitLoaded] = useState(false);
   const appearance = useAppearance(api);
   useEffect(() => {
@@ -191,6 +203,11 @@ export function App() {
   const rows = data.downloads.filter(
       (d) =>
         (view !== "Torrents" || d.bittorrent || d.infoHash) &&
+        (!categoryState ||
+          !categoryFilter ||
+          (categoryFilter === "uncategorized"
+            ? !categoryState.assignments[d.gid]
+            : categoryState.assignments[d.gid] === categoryFilter)) &&
         name(d).toLowerCase().includes(search.toLowerCase()),
     ),
     d = rows.find((d) => d.gid === selected) || rows[0];
@@ -377,6 +394,23 @@ export function App() {
               <span>
                 <I name="shield-check" /> Files stay on this device
               </span>
+              <label>
+                Category filter
+                <select
+                  aria-label="Filter downloads by category"
+                  disabled={!categoryState}
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                >
+                  <option value="">All categories</option>
+                  <option value="uncategorized">Uncategorized</option>
+                  {categoryState?.categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <div className="table-wrap">
               <table>
@@ -449,11 +483,19 @@ export function App() {
               <section className="empty">
                 <I name="download" />
                 <h2>
-                  {search ? "No matching downloads" : "Ready when you are"}
+                  {search || categoryFilter
+                    ? "No matching downloads"
+                    : "Ready when you are"}
                 </h2>
-                <p>Add a link and keep every transfer in one place.</p>
+                <p>
+                  {search || categoryFilter
+                    ? "Try another search or category."
+                    : "Add a link and keep every transfer in one place."}
+                </p>
                 <button className="primary" onClick={() => setDialog(true)}>
-                  Add your first download
+                  {search || categoryFilter
+                    ? "Add download"
+                    : "Add your first download"}
                 </button>
               </section>
             )}
@@ -484,8 +526,15 @@ export function App() {
                 />
                 <dl>
                   <div>
-                    <dt>Speed</dt>
-                    <dd>{size(d.downloadSpeed)}/s</dd>
+                    <dt>{d.status === "seeding" ? "Upload speed" : "Speed"}</dt>
+                    <dd>
+                      {size(
+                        d.status === "seeding"
+                          ? d.uploadSpeed
+                          : d.downloadSpeed,
+                      )}
+                      /s
+                    </dd>
                   </div>
                   <div>
                     <dt>Remaining</dt>
@@ -508,6 +557,30 @@ export function App() {
                     <dd>{d.connections || 0}</dd>
                   </div>
                 </dl>
+                {categoryState && (
+                  <label className="field">
+                    Download category
+                    <select
+                      value={categoryState.assignments[d.gid] || ""}
+                      disabled={busy}
+                      onChange={(e) =>
+                        act("categories", {
+                          action: "assign",
+                          gid: d.gid,
+                          id: e.target.value,
+                          revision: categoryState.revision,
+                        })
+                      }
+                    >
+                      <option value="">Uncategorized</option>
+                      {categoryState.categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {d.native && (
                   <p>
                     Native BitTorrent · {d.torrentState} ·{" "}
@@ -632,6 +705,11 @@ export function App() {
           <section className="settings">
             <h2>Transfer preferences</h2>
             <AppearanceSettings appearance={appearance} />
+            <CategoriesManager
+              state={categoryState}
+              api={api}
+              onChange={refresh}
+            />
             <BrowserConnections api={api} />
             <SavedLogins api={api} />
             <HistoryExport api={api} />

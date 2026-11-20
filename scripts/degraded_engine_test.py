@@ -40,6 +40,7 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
     (data / 'addons/registry.json').write_text('invalid add-on registry fixture')
     (data / 'history.json').write_text('invalid history fixture')
     (data / 'appearance.json').write_text('invalid appearance fixture')
+    (data / 'categories.json').write_text('invalid categories fixture')
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     child = subprocess.Popen([str(pathlib.Path(args.exe).resolve()), '--no-browser', '--engine', 'odm-missing-test-engine', '--data-dir', str(data), '--downloads', str(root / 'files')], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
@@ -80,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
         else:
             assert (data / 'torrents.db').read_bytes() == original_db
         assert (data / 'addons/registry.json').read_text() == 'invalid add-on registry fixture'
-        for route in ['history-export','preferences']:
+        for route in ['history-export','preferences','categories']:
             try:
                 api(route)
                 raise AssertionError('Corrupt optional state treated as healthy')
@@ -88,6 +89,7 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
                 assert error.code == 503
         assert (data / 'history.json').read_text() == 'invalid history fixture'
         assert (data / 'appearance.json').read_text() == 'invalid appearance fixture'
+        assert (data / 'categories.json').read_text() == 'invalid categories fixture'
         print('PASS: HTTP works with corrupt optional state; original component data retained and failures reported; limits-only=' + str(args.limits_only))
     finally:
         api('quit', {})
