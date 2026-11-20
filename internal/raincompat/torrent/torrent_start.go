@@ -18,7 +18,7 @@ import (
 )
 
 func (t *torrent) start() {
-	if t.seedUntil > 0 && time.Now().Unix() >= t.seedUntil {
+	if t.seedingFinished(time.Now()) {
 		t.stopAfterDownload = true
 	}
 	// Do not start if already started.

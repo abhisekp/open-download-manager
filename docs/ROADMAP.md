@@ -6,7 +6,7 @@ The target is an independent IDM/FDM/MDM-style desktop download manager with a f
 |---|---|---|
 | HTTP transfers | Native segmented/single-stream transfers, HTTPS Basic OS-keyring accounts, bounded automatic retries with durable backoff, queue fairness and crash recovery | Wider disk/origin/CDN/proxy and authentication coverage |
 | Parallel transfer/resume | Three fixed native ranges for strong-validator resources ≥8 MiB, per-range crash checkpoints, safe changed-resource fallback and single-connection choice; optional aria2 parallel transfers | Dynamic splitting, mirrors and broader origin/CDN/platform compatibility |
-| Torrents/magnets | Native Rain integration, metadata import, local peer transfer, persistence, permission-gated public tracker additions/atomic paused replacement, bounded opt-in seeding and live shared download/upload caps | File selection, priorities, ratio-based policies and public/private swarm matrix |
+| Torrents/magnets | Native Rain integration, metadata import, local peer transfer, persistence, permission-gated public tracker additions/atomic paused replacement, bounded opt-in seeding with optional ratio targets and live shared download/upload caps | File selection, priorities, hard per-torrent upload budgets and public/private swarm matrix |
 | FTP/SFTP | Engine URI path accepted | Real protocol/authentication tests and credential storage design |
 | Queue | Persisted native HTTP ordering, concurrency/per-source-host limits, pause/resume and batch import | Unified torrent/aria2 queue groups and richer queue policies |
 | Scheduling | Persisted one-time native HTTP UTC starts with local-time UI, paused/overdue/crash recovery and real byte verification | Recurring windows, torrent/aria2 schedules and OS wake integration |

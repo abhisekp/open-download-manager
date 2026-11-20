@@ -593,7 +593,7 @@ export function App() {
                 )}
                 {d.native && (
                   <TorrentTrackers
-                    key={d.gid}
+                    key={"trackers:" + d.gid}
                     gid={d.gid}
                     api={api}
                     suggestions={trackers}
@@ -601,7 +601,7 @@ export function App() {
                 )}
                 {d.native && (
                   <TorrentSeeding
-                    key={d.gid}
+                    key={"seeding:" + d.gid}
                     gid={d.gid}
                     api={api}
                     onChange={refresh}

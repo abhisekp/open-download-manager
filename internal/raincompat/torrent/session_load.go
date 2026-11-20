@@ -65,7 +65,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		return
 	}
 	hasStarted = spec.Started
-	seedUntil, err := s.readSeedingDeadline(id)
+	seedUntil, seedRatio, err := s.readSeedingPolicy(id)
 	if err != nil {
 		return nil, false, err
 	}
@@ -79,6 +79,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	var info *metainfo.Info
 	var bf *bitfield.Bitfield
 	var private bool
+	var ratioTarget int64
 	if len(spec.Info) > 0 {
 		info2, err2 := s.parseInfo(spec.Info, spec.Version)
 		if err2 != nil {
@@ -86,6 +87,16 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		}
 		info = info2
 		private = info.Private
+		if seedRatio > 0 {
+			ratioTarget, err = seedingRatioTarget(info.Length-info.Padding, seedRatio)
+			if err != nil {
+				return nil, false, err
+			}
+			if spec.BytesUploaded >= ratioTarget {
+				hasStarted = false
+				spec.StopAfterDownload = true
+			}
+		}
 		if len(spec.Bitfield) > 0 {
 			bf3, err3 := bitfield.NewBytes(spec.Bitfield, info.NumPieces)
 			if err3 != nil {
@@ -93,6 +104,9 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 			}
 			bf = bf3
 		}
+	}
+	if seedRatio > 0 && info == nil {
+		return nil, false, fmt.Errorf("seeding ratio without torrent metadata; retained")
 	}
 	sto, err := s.storage.GetStorage(id)
 	if err != nil {
@@ -127,7 +141,12 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	}
 	t.rawTrackers = spec.Trackers
 	initialized := make(chan struct{})
-	t.sendCommand(func() { t.seedUntil = seedUntil; close(initialized) })
+	t.sendCommand(func() {
+		t.seedUntil = seedUntil
+		t.seedRatioPercent = seedRatio
+		t.seedRatioTarget = ratioTarget
+		close(initialized)
+	})
 	<-initialized
 	t.rawWebseedSources = spec.URLList
 	go s.checkTorrent(t)

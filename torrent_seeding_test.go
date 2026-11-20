@@ -115,6 +115,11 @@ func TestSeedingOwnerConsentAndRestart(t *testing.T) {
 		{`{"minutes":10}`, app.token, "", 400},
 		{`{"minutes":1441,"approved":true}`, app.token, "", 400},
 		{`{"minutes":-1}`, app.token, "", 400},
+		{`{"minutes":1,"ratioPercent":-1,"approved":true}`, app.token, "", 400},
+		{`{"minutes":1,"ratioPercent":10001,"approved":true}`, app.token, "", 400},
+		{`{"minutes":0,"ratioPercent":100,"approved":true}`, app.token, "", 400},
+		{`{"minutes":1,"ratioPercent":0.5,"approved":true}`, app.token, "", 400},
+		{`{"minutes":1,"ratioPercent":100,"approved":false}`, app.token, "", 400},
 		{`{"minutes":1,"approved":true,"hidden":true}`, app.token, "", 400},
 	} {
 		body := strings.Replace(tc.body, "{", `{"gid":"`+gid+`",`, 1)
@@ -159,5 +164,85 @@ func TestSeedingOwnerConsentAndRestart(t *testing.T) {
 	active := addTrackerFixtureTorrent(t, restored, false)
 	if _, err = restored.seeding(active, 1, true, true); err == nil {
 		t.Fatal("incomplete torrent allowed seeding")
+	}
+}
+
+func TestSeedingRatioRealPeerAndRestart(t *testing.T) {
+	root := ownedTestDir(t)
+	files := filepath.Join(root, "files")
+	n, err := newNativeTorrents(root, files, "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer n.Close()
+	tor, payload, hash := completedSeedFixture(t, n)
+	app := &App{engine: &Engine{Native: n}, token: "ratio-fixture-owner", host: "127.0.0.1:9945"}
+	req := httptest.NewRequest("POST", "http://"+app.host+"/api/torrent-seeding", strings.NewReader(`{"gid":"`+tor.ID()+`","minutes":5,"ratioPercent":100,"approved":true}`))
+	req.Header.Set("Authorization", "Bearer "+app.token)
+	out := httptest.NewRecorder()
+	app.handler().ServeHTTP(out, req)
+	if out.Code != 200 {
+		t.Fatal("approved ratio API failed", out.Code, out.Body.String())
+	}
+	var policy rain.SeedingState
+	if err = json.Unmarshal(out.Body.Bytes(), &policy); err != nil || policy.RatioPercent != 100 || policy.TargetBytes != int64(len(payload)) {
+		t.Fatal("wrong reviewed ratio", err, policy)
+	}
+	waitSeeding(t, tor)
+	targetRoot := ownedTestDir(t)
+	target, err := newNativeTorrents(targetRoot, filepath.Join(targetRoot, "files"), "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer target.Close()
+	raw, err := target.addURI("magnet:?xt=urn:btih:" + hash + "&x.pe=" + url.QueryEscape("127.0.0.1:"+strconv.Itoa(tor.Stats().Port)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gid string
+	if err = json.Unmarshal(raw, &gid); err != nil {
+		t.Fatal(err)
+	}
+	download := target.session.GetTorrent(gid)
+	waitNative(t, download)
+	actual, err := os.ReadFile(filepath.Join(download.Dir(), "shared.bin"))
+	if err != nil || !bytes.Equal(actual, payload) {
+		t.Fatal("ratio transfer corrupted bytes", err)
+	}
+	deadline := time.Now().Add(8 * time.Second)
+	for tor.Stats().Status != rain.Stopped {
+		if time.Now().After(deadline) {
+			t.Fatal("reached ratio kept sharing")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	state := tor.SeedingState()
+	if state.Active || state.UploadedBytes < state.TargetBytes || state.Until <= time.Now().Unix() {
+		t.Fatal("ratio did not stop before time limit", state)
+	}
+	if err = n.Close(); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := newNativeTorrents(root, files, "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restored.Close()
+	resumed := restored.session.GetTorrent(tor.ID())
+	if resumed == nil || resumed.Stats().Status != rain.Stopped || resumed.SeedingState().RatioPercent != 100 {
+		t.Fatal("reached ratio resumed or disappeared")
+	}
+	if _, err = restored.seedingPolicy(tor.ID(), 5, 100, true, true); err == nil {
+		t.Fatal("already reached ratio accepted")
+	}
+	if _, err = restored.seedingPolicy(tor.ID(), 5, 200, true, true); err != nil {
+		t.Fatal("newly approved higher goal refused", err)
+	}
+	if _, err = restored.seedingPolicy(tor.ID(), 0, 0, false, true); err != nil {
+		t.Fatal(err)
+	}
+	state = resumed.SeedingState()
+	if state.RatioPercent != 0 || state.TargetBytes != 0 || state.Until != 0 {
+		t.Fatal("stop retained sharing policy", state)
 	}
 }

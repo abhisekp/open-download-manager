@@ -245,6 +245,8 @@ type torrent struct {
 	// If true, the torrent is stopped automatically when all torrent pieces are downloaded.
 	stopAfterDownload bool
 	seedUntil         int64
+	seedRatioPercent  int
+	seedRatioTarget   int64
 
 	// If true, the torrent is stopped automatically when all metadata pieces are downloaded.
 	stopAfterMetadata bool
