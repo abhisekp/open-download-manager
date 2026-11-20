@@ -6,7 +6,7 @@ ODM is **not complete or production-ready**. The independent IDM/FDM/MDM product
 
 | Milestone | Current implementation | Required acceptance |
 |---|---|---|
-| Reliable transfer core | Native torrents and fallback HTTP/HTTPS; optional aria2; checkpointed resume/finalization and native platform evidence | Authentication UI/credential storage, native segmentation, disk-full matrix and real FTP/SFTP verification |
+| Reliable transfer core | Native torrents and HTTP/HTTPS, including three fixed ranges with per-range crash checkpoints and changed-resource isolation; optional aria2; local real-process integrity evidence | Same-revision segmented platform CI, authentication/credential storage, automatic retries, broader disk-full/origin/CDN matrix and real FTP/SFTP verification |
 | Desktop application | Native window/tray, single instance and explicit background/quit; actual packaged runtime/transfer/quit CI passed on all six x64/ARM64 targets at `e059994` | Native install/update/uninstall, accessible keyboard journeys and notifications; Linux install paths must avoid spaces |
 | Add-on foundation | Signed local WASI resolvers, reviewed permissions, isolated workers, lifecycle/persistence and real resolver-to-download handoff; native tests passed | OS-enforced worker RSS limits and independent hardening |
 | Complete extension platform | Resolver SDK/API 1 and built-in tracker feed | Controlled provider networking/credentials, events/UI contributions, compatibility policy, richer examples and update distribution |

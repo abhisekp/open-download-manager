@@ -24,6 +24,7 @@ export function HttpQueue({ api, refreshDownloads }) {
     [later, setLater] = useState(false),
     [start, setStart] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [singleStream, setSingleStream] = useState(false);
   useEffect(() => {
     let alive = true;
     const load = async (initial = false) => {
@@ -89,7 +90,7 @@ export function HttpQueue({ api, refreshDownloads }) {
       return;
     }
     change(
-      { action: "add", url: url.trim(), startAt: when },
+      { action: "add", url: url.trim(), startAt: when, singleStream },
       later
         ? "Schedule saved. ODM must be running to start the download."
         : "Download added to the queue.",
@@ -194,6 +195,14 @@ export function HttpQueue({ api, refreshDownloads }) {
             onChange={(e) => setURL(e.target.value)}
             placeholder="https://example.com/file.zip"
           />
+        </label>
+        <label className="queue-check">
+          <input
+            type="checkbox"
+            checked={singleStream}
+            onChange={(e) => setSingleStream(e.target.checked)}
+          />
+          Use one connection (for servers that limit parallel requests)
         </label>
         <label className="queue-check">
           <input

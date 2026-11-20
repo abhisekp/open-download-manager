@@ -75,7 +75,7 @@ func (e *Engine) httpRow(job transfers.Job) json.RawMessage {
 	if status == "finalizing" {
 		status = "active"
 	}
-	row, _ := json.Marshal(map[string]any{"gid": job.ID, "status": status, "totalLength": strconv.FormatInt(job.Total, 10), "completedLength": strconv.FormatInt(job.Completed, 10), "downloadSpeed": strconv.FormatInt(job.Speed, 10), "uploadSpeed": "0", "connections": "1", "engine": "native-http", "files": []any{map[string]any{"index": "1", "path": filepath.Join(e.HTTPDirectory, job.Name), "length": strconv.FormatInt(job.Total, 10), "completedLength": strconv.FormatInt(job.Completed, 10), "selected": "true", "uris": []any{map[string]string{"uri": job.URL, "status": "used"}}}}, "errorMessage": job.Error})
+	row, _ := json.Marshal(map[string]any{"gid": job.ID, "status": status, "totalLength": strconv.FormatInt(job.Total, 10), "completedLength": strconv.FormatInt(job.Completed, 10), "downloadSpeed": strconv.FormatInt(job.Speed, 10), "uploadSpeed": "0", "connections": strconv.Itoa(job.Connections), "engine": "native-http", "files": []any{map[string]any{"index": "1", "path": filepath.Join(e.HTTPDirectory, job.Name), "length": strconv.FormatInt(job.Total, 10), "completedLength": strconv.FormatInt(job.Completed, 10), "selected": "true", "uris": []any{map[string]string{"uri": job.URL, "status": "used"}}}}, "errorMessage": job.Error})
 	return row
 }
 

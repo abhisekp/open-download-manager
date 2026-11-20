@@ -3,14 +3,17 @@ package transfers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -26,8 +29,37 @@ func openTest(t *testing.T, client *http.Client) (*Manager, Config) {
 		if err := m.Close(); err != nil {
 			t.Error("manager cleanup:", err)
 		}
+		// Windows may report a just-deleted child as nonempty while its final
+		// handles drain. Retry only known transient Windows deletion errors in
+		// these exact test-owned children; leaked handles still fail after 2s.
+		for _, dir := range []string{config.DataDir, config.Downloads} {
+			cleanupTestChild(t, dir)
+		}
 	})
 	return m, config
+}
+
+func cleanupTestChild(t *testing.T, dir string) {
+	t.Helper()
+	root, err := os.OpenRoot(filepath.Dir(dir))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer root.Close()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		err = root.RemoveAll(filepath.Base(dir))
+		if err == nil {
+			return
+		}
+		transient := errors.Is(err, syscall.Errno(145)) || errors.Is(err, syscall.Errno(5)) || errors.Is(err, syscall.Errno(32))
+		if runtime.GOOS != "windows" || !transient || time.Now().After(deadline) {
+			t.Error("test-owned directory cleanup:", err)
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 func await(t *testing.T, m *Manager, id string, predicate func(Job) bool) Job {
 	t.Helper()

@@ -6,7 +6,7 @@ The current build is an early implementation based on the selected light/blue de
 
 ## Run
 
-Install Go 1.26.11 and Node.js 22+ for source builds. HTTP/HTTPS downloads and native torrents work without aria2. For FTP/SFTP and accelerated parallel file transfers, optionally install aria2 for your operating system and CPU and put `aria2c` on PATH. The application never installs or downloads an engine automatically.
+Install Go 1.26.11 and Node.js 22+ for source builds. HTTP/HTTPS downloads, native parallel ranges and native torrents work without aria2. For FTP/SFTP or the optional aria2 transfer engine, install aria2 for your operating system and CPU and put `aria2c` on PATH. The application never installs or downloads an engine automatically.
 
 ```sh
 npm ci --prefix ui --ignore-scripts
@@ -22,7 +22,7 @@ Portable archives under `dist/` contain the application, not aria2. HTTP/HTTPS a
 ## Current behavior
 
 - Download BitTorrent magnets and import `.torrent` files using the in-process MIT-licensed Rain library. Native torrent state is saved in a separate local database.
-- Add HTTP/HTTPS file URLs through the built-in fallback when aria2 is absent; installed aria2 handles accelerated HTTP and FTP/SFTP. Native HTTP includes a three-transfer queue, validator-aware resume, crash checkpoints, safe collision handling, TLS checks, stall cancellation and persisted per-engine speed limits.
+- Add HTTP/HTTPS file URLs through the built-in engine when aria2 is absent, or explicitly through Queue & schedules. Native HTTP supports three parallel ranges for suitable files of at least 8 MiB, validated per-range crash checkpoints and a single-connection option. It includes bounded queues, safe collisions, TLS checks, stall cancellation and persisted speed limits. Installed aria2 separately handles its HTTP and FTP/SFTP transfers. See [native HTTP behavior](docs/NATIVE-HTTP.md).
 - View progress, speed, connections and transfer states; pause, resume, remove, search, and filter torrents.
 - Import up to 50 newline-separated links with duplicate removal and per-link results.
 - Verify the first file of a completed transfer against an expected SHA-256 checksum (up to 1 GiB).

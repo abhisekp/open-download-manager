@@ -31,13 +31,31 @@ func modifiedTime(value string) string {
 }
 
 func (m *Manager) download(parent context.Context, id string) error {
+	m.mu.Lock()
+	segmented := len(m.jobs[id].Segments) != 0
+	m.mu.Unlock()
+	if segmented {
+		err := m.segmented(parent, id)
+		if !errors.Is(err, errRestartStream) {
+			return err
+		}
+		if err = m.resetSegments(id); err != nil {
+			return err
+		}
+		return m.stream(parent, id, false)
+	}
+	return m.stream(parent, id, true)
+}
+
+func (m *Manager) stream(parent context.Context, id string, allowSegments bool) error {
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	m.mu.Lock()
-	job := *m.jobs[id]
+	job := copyJob(m.jobs[id])
+	m.jobs[id].Connections = 1
 	m.mu.Unlock()
 	file, err := m.root.OpenFile(partial(id), os.O_RDWR, 0600)
 	if err != nil {
@@ -113,7 +131,7 @@ func (m *Manager) download(parent context.Context, id string) error {
 			if err != nil {
 				return errors.New("cannot persist changed resource metadata")
 			}
-			return m.download(parent, id)
+			return m.stream(parent, id, allowSegments)
 		}
 		total = size
 	} else {
@@ -141,6 +159,32 @@ func (m *Manager) download(parent context.Context, id string) error {
 		return errors.New("cannot persist download metadata")
 	}
 	ready = true
+	// Only strong validators and explicit range support permit parallel ranges.
+	// Close the probe before allocating workers; unsupported servers retain the
+	// existing single-stream implementation and its validator-aware resume.
+	if allowSegments && !job.SingleStream && offset == 0 && total >= 8<<20 && strongETag(response.Header.Get("ETag")) != "" && strings.EqualFold(response.Header.Get("Accept-Ranges"), "bytes") {
+		_ = response.Body.Close()
+		if err = file.Close(); err != nil {
+			closed = true
+			return errors.New("cannot close range probe file")
+		}
+		closed = true
+		m.mu.Lock()
+		m.jobs[id].Segments = makeSegments(total)
+		err = m.save()
+		m.mu.Unlock()
+		if err != nil {
+			return errors.New("cannot persist segment layout")
+		}
+		err = m.segmented(parent, id)
+		if !errors.Is(err, errRestartStream) {
+			return err
+		}
+		if err = m.resetSegments(id); err != nil {
+			return err
+		}
+		return m.stream(parent, id, false)
+	}
 	var lastRead atomic.Int64
 	lastRead.Store(time.Now().UnixNano())
 	watchDone := make(chan struct{})
@@ -289,6 +333,7 @@ func (m *Manager) finalize(ctx context.Context, id string, size int64) error {
 		}
 		job.Status = "complete"
 		job.Speed = 0
+		job.Connections = 0
 		job.Error = ""
 		if err = m.save(); err != nil {
 			return errors.New("completed file saved; final status will recover on restart")

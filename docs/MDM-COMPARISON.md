@@ -6,7 +6,7 @@ Reference: https://misterdownloadmanager.com/features/
 
 | Documented MDM area | ODM today | Proposed acceptance criteria |
 |---|---|---|
-| Acceleration and resume | Native single-stream HTTP with validators/checkpoints; optional aria2 parallel transfers; real interruption/resume checks | Native segmentation, broader server/disk-full matrix and clear resume capability |
+| Acceleration and resume | Native three-range/single-stream HTTP with validators/checkpoints; optional aria2 parallel transfers; real interruption/resume checks | Dynamic splitting, broader server/disk-full matrix and clear resume capability |
 | Browser extension | Firefox/Chrome/Edge installed checks passed; Firefox Awaiting Review and Edge In review, both with actual screenshots | Marketplace install read-back, native messaging, supported interception and explicit credential/referrer consent |
 | Video and gallery downloads | None | Optional provider adapters, bounded collections, quality selection and managed helper versions |
 | Torrents | Native Rain, magnets/import, local peer bytes, persistence and reviewed public tracker additions; private/unknown-metadata protections | File selection/priorities, seeding/traffic controls, tracker replacement and public/private swarm matrix |

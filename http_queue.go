@@ -25,12 +25,13 @@ func (a *App) httpQueueAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Action   string                  `json:"action"`
-		URL      string                  `json:"url"`
-		StartAt  int64                   `json:"startAt"`
-		GID      string                  `json:"gid"`
-		Position string                  `json:"position"`
-		Settings transfers.QueueSettings `json:"settings"`
+		Action       string                  `json:"action"`
+		URL          string                  `json:"url"`
+		StartAt      int64                   `json:"startAt"`
+		SingleStream bool                    `json:"singleStream"`
+		GID          string                  `json:"gid"`
+		Position     string                  `json:"position"`
+		Settings     transfers.QueueSettings `json:"settings"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384))
 	decoder.DisallowUnknownFields()
@@ -46,15 +47,15 @@ func (a *App) httpQueueAPI(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "unexpected add fields", 400)
 			return
 		}
-		gid, err = m.AddPlanned(in.URL, in.StartAt)
+		gid, err = m.AddWithOptions(in.URL, transfers.AddOptions{StartAt: in.StartAt, SingleStream: in.SingleStream})
 	case "move":
-		if in.URL != "" || in.StartAt != 0 || in.Settings != (transfers.QueueSettings{}) {
+		if in.URL != "" || in.StartAt != 0 || in.SingleStream || in.Settings != (transfers.QueueSettings{}) {
 			http.Error(w, "unexpected move fields", 400)
 			return
 		}
 		err = m.Move(in.GID, in.Position)
 	case "settings":
-		if in.URL != "" || in.StartAt != 0 || in.GID != "" || in.Position != "" {
+		if in.URL != "" || in.StartAt != 0 || in.SingleStream || in.GID != "" || in.Position != "" {
 			http.Error(w, "unexpected settings fields", 400)
 			return
 		}

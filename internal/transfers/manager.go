@@ -25,20 +25,23 @@ import (
 )
 
 type Job struct {
-	ID        string `json:"id"`
-	URL       string `json:"url"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	Total     int64  `json:"total"`
-	Completed int64  `json:"completed"`
-	Committed int64  `json:"committed"`
-	ETag      string `json:"etag"`
-	Modified  string `json:"last_modified"`
-	Error     string `json:"error"`
-	Created   int64  `json:"created"`
-	Order     int    `json:"order,omitempty"`
-	StartAt   int64  `json:"startAt,omitempty"`
-	Speed     int64  `json:"-"`
+	ID           string    `json:"id"`
+	URL          string    `json:"url"`
+	Name         string    `json:"name"`
+	Status       string    `json:"status"`
+	Total        int64     `json:"total"`
+	Completed    int64     `json:"completed"`
+	Committed    int64     `json:"committed"`
+	ETag         string    `json:"etag"`
+	Modified     string    `json:"last_modified"`
+	Error        string    `json:"error"`
+	Created      int64     `json:"created"`
+	Order        int       `json:"order,omitempty"`
+	StartAt      int64     `json:"startAt,omitempty"`
+	Segments     []Segment `json:"segments,omitempty"`
+	Connections  int       `json:"-"`
+	SingleStream bool      `json:"singleStream,omitempty"`
+	Speed        int64     `json:"-"`
 }
 
 type state struct {
@@ -163,6 +166,9 @@ func Open(config Config) (*Manager, error) {
 			if !validID(job.ID) || !validURL(job.URL) || safeName(job.Name) != job.Name || job.Total < 0 || job.Completed < 0 || job.Committed < 0 || job.Committed > job.Completed || job.Order < 0 || job.Order > 200 || job.StartAt < 0 || job.StartAt > 253402300799000 || m.jobs[job.ID] != nil {
 				return fail(errors.New("invalid native HTTP task"))
 			}
+			if !validSegments(job) {
+				return fail(errors.New("invalid native HTTP segment checkpoint"))
+			}
 			switch job.Status {
 			case "complete", "error", "removed", "paused":
 			case "scheduled":
@@ -206,7 +212,7 @@ func Open(config Config) (*Manager, error) {
 func (m *Manager) snapshot() []Job {
 	rows := make([]Job, 0, len(m.jobs))
 	for _, job := range m.jobs {
-		rows = append(rows, *job)
+		rows = append(rows, copyJob(job))
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].Order != rows[j].Order {
@@ -280,6 +286,16 @@ func (m *Manager) Add(raw string) (string, error) {
 // AddPlanned persists a one-time schedule before it becomes runnable. A zero
 // timestamp queues immediately; a future timestamp is milliseconds since Unix epoch.
 func (m *Manager) AddPlanned(raw string, startAt int64) (string, error) {
+	return m.AddWithOptions(raw, AddOptions{StartAt: startAt})
+}
+
+type AddOptions struct {
+	StartAt      int64
+	SingleStream bool
+}
+
+func (m *Manager) AddWithOptions(raw string, options AddOptions) (string, error) {
+	startAt := options.StartAt
 	if !validURL(raw) {
 		return "", errors.New("use an HTTP or HTTPS URL without embedded credentials")
 	}
@@ -324,7 +340,7 @@ func (m *Manager) AddPlanned(raw string, startAt int64) (string, error) {
 		previousOrders[row.ID] = row.Order
 		m.jobs[row.ID].Order = i + 1
 	}
-	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: status, Created: time.Now().UnixNano(), Order: len(m.jobs) + 1, StartAt: startAt}
+	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: status, Created: time.Now().UnixNano(), Order: len(m.jobs) + 1, StartAt: startAt, SingleStream: options.SingleStream}
 	if err = m.save(); err != nil {
 		delete(m.jobs, id)
 		for key, order := range previousOrders {
@@ -449,6 +465,7 @@ func (m *Manager) run(ctx context.Context, id string) {
 		}
 	}
 	job.Speed = 0
+	job.Connections = 0
 	delete(m.running, id)
 	_ = m.save()
 }
