@@ -21,7 +21,7 @@ func TestNativeHTTPAdapterSurvivesOptionalEngineFailure(t *testing.T) {
 	rpc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "invalid RPC", 500) }))
 	address := rpc.URL
 	rpc.Close()
-	dir := t.TempDir()
+	dir := ownedTestDir(t)
 	direct, err := transfers.Open(transfers.Config{DataDir: filepath.Join(dir, "data"), Downloads: filepath.Join(dir, "files")})
 	if err != nil {
 		t.Fatal(err)

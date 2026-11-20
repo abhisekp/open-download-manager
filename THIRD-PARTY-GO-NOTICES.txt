@@ -73,6 +73,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+ODM local source replacement: internal/raincompat; see its source/license/patch documentation.
 
 === github.com/creachadair/jrpc2 v1.3.6 ===
 LICENSE
@@ -1653,6 +1654,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+ODM local source replacement: internal/nettoolscompat; see its source/license/patch documentation.
 
 === github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 ===
 LICENSE

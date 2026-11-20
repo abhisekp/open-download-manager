@@ -38,3 +38,5 @@ require (
 )
 
 replace github.com/nictuku/nettools => ./internal/nettoolscompat
+
+replace github.com/cenkalti/rain/v2 => ./internal/raincompat

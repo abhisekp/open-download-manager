@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 )
 
 // Bounded local history stores terminal engine records; unfinished jobs remain in aria2's session.
@@ -20,10 +23,23 @@ type History struct {
 
 func openHistory(path string) (*History, error) {
 	h := &History{path: path, rows: map[string]json.RawMessage{}, forgotten: map[string]bool{}}
-	b, e := os.ReadFile(path)
+	info, e := os.Lstat(path)
 	if os.IsNotExist(e) {
 		return h, nil
 	}
+	if e != nil || !info.Mode().IsRegular() || info.Size() > 16<<20 {
+		return nil, errors.New("history is not a supported regular file; original retained")
+	}
+	f, e := os.Open(path)
+	if e != nil {
+		return nil, e
+	}
+	defer f.Close()
+	opened, e := f.Stat()
+	if e != nil || !os.SameFile(info, opened) {
+		return nil, errors.New("history file changed while opening; original retained")
+	}
+	b, e := io.ReadAll(io.LimitReader(f, (16<<20)+1))
 	if e != nil {
 		return nil, e
 	}
@@ -41,6 +57,9 @@ func openHistory(path string) (*History, error) {
 		if json.Unmarshal(raw, &row) != nil || row.GID != gid || gid == "" || (row.Status != "complete" && row.Status != "error" && row.Status != "removed") {
 			return nil, errors.New("invalid history record; preserve history before recovery")
 		}
+		if at := historyRecordedAt(raw); at < 0 || at > 253402300799000 {
+			return nil, errors.New("invalid history timestamp; original retained")
+		}
 	}
 	return h, nil
 }
@@ -49,7 +68,10 @@ func (h *History) write() error {
 	for k := range h.rows {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool {
+		a, b := historyRecordedAt(h.rows[keys[i]]), historyRecordedAt(h.rows[keys[j]])
+		return a < b || a == b && keys[i] < keys[j]
+	})
 	for len(keys) > 500 {
 		delete(h.rows, keys[0])
 		keys = keys[1:]
@@ -91,22 +113,38 @@ func (h *History) merge(current []json.RawMessage) ([]json.RawMessage, error) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	before := maps.Clone(h.rows)
 	seen := map[string]bool{}
 	changed := false
 	filtered := make([]json.RawMessage, 0, len(current))
 	for _, raw := range current {
 		var row struct{ GID, Status string }
-		if json.Unmarshal(raw, &row) != nil {
+		if json.Unmarshal(raw, &row) != nil || row.GID == "" {
 			continue
 		}
-		if h.forgotten[row.GID] {
+		if h.forgotten[row.GID] && terminalHistoryStatus(row.Status) {
 			continue
 		}
 		filtered = append(filtered, raw)
 		seen[row.GID] = true
 		if row.Status == "complete" || row.Status == "error" || row.Status == "removed" {
-			if !bytes.Equal(h.rows[row.GID], raw) {
-				h.rows[row.GID] = append(json.RawMessage(nil), raw...)
+			var previous struct {
+				Status     string
+				RecordedAt int64 `json:"recordedAt"`
+			}
+			_ = json.Unmarshal(h.rows[row.GID], &previous)
+			at := previous.RecordedAt
+			if previous.Status != row.Status {
+				at = time.Now().UnixMilli()
+			}
+			var record map[string]json.RawMessage
+			if json.Unmarshal(raw, &record) != nil {
+				continue
+			}
+			record["recordedAt"], _ = json.Marshal(at)
+			stored, _ := json.Marshal(record)
+			if !bytes.Equal(h.rows[row.GID], stored) {
+				h.rows[row.GID] = stored
 				changed = true
 			}
 		}
@@ -128,7 +166,8 @@ func (h *History) merge(current []json.RawMessage) ([]json.RawMessage, error) {
 	}
 	if changed {
 		if e := h.write(); e != nil {
-			return nil, e
+			h.rows = before
+			return current, e
 		}
 	}
 	return current, nil
@@ -147,7 +186,30 @@ func (h *History) forget(gid string) error {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	before := maps.Clone(h.rows)
+	forgotten, had := h.forgotten[gid]
 	delete(h.rows, gid)
 	h.forgotten[gid] = true
-	return h.write()
+	if err := h.write(); err != nil {
+		h.rows = before
+		if had {
+			h.forgotten[gid] = forgotten
+		} else {
+			delete(h.forgotten, gid)
+		}
+		return err
+	}
+	return nil
+}
+
+func historyRecordedAt(raw json.RawMessage) int64 {
+	var record struct {
+		RecordedAt int64 `json:"recordedAt"`
+	}
+	_ = json.Unmarshal(raw, &record)
+	return record.RecordedAt
+}
+
+func terminalHistoryStatus(status string) bool {
+	return status == "complete" || status == "error" || status == "removed"
 }

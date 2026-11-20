@@ -1,0 +1,477 @@
+// Package torrent provides a BitTorrent client implementation.
+package torrent
+
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/cenkalti/rain/v2/internal/bitfield"
+	"github.com/cenkalti/rain/v2/internal/blocklist"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/metainfo"
+	"github.com/cenkalti/rain/v2/internal/peer"
+	"github.com/cenkalti/rain/v2/internal/piececache"
+	"github.com/cenkalti/rain/v2/internal/resolver"
+	"github.com/cenkalti/rain/v2/internal/resourcemanager"
+	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
+	"github.com/cenkalti/rain/v2/internal/semaphore"
+	"github.com/cenkalti/rain/v2/internal/tracker"
+	"github.com/cenkalti/rain/v2/internal/trackermanager"
+	"github.com/cenkalti/rain/v2/storage"
+	"github.com/juju/ratelimit"
+	"github.com/nictuku/dht"
+	"go.etcd.io/bbolt"
+	berrors "go.etcd.io/bbolt/errors"
+)
+
+var (
+	sessionBucket         = []byte("session")
+	torrentsBucket        = []byte("torrents")
+	blocklistKey          = []byte("blocklist")
+	blocklistTimestampKey = []byte("blocklist-timestamp")
+	blocklistURLHashKey   = []byte("blocklist-url-hash")
+)
+
+// Session contains torrents, DHT node, caches and other data structures shared by multiple torrents.
+type Session struct {
+	config         Config
+	db             *bbolt.DB
+	storage        storage.Provider
+	resumer        *boltdbresumer.Resumer
+	log            logger.Logger
+	extensions     [8]byte
+	dht            *dht.DHT
+	rpc            *rpcServer
+	trackerManager *trackermanager.TrackerManager
+	ram            *resourcemanager.ResourceManager[*peer.Peer]
+	pieceCache     *piececache.Cache
+	webseedClient  http.Client
+	createdAt      time.Time
+	semWrite       *semaphore.Semaphore
+	metrics        *sessionMetrics
+	bucketDownload *ratelimit.Bucket
+	bucketUpload   *ratelimit.Bucket
+	closeC         chan struct{}
+
+	// "stopped" event announcers of closed torrents, still running in the background.
+	detachedAnnouncers sync.WaitGroup
+
+	mPeerRequests   sync.Mutex
+	dhtPeerRequests map[*torrent]struct{}
+
+	mTorrents          sync.RWMutex
+	torrents           map[string]*Torrent
+	torrentsByInfoHash map[dht.InfoHash][]*Torrent
+	invalidTorrentIDs  []string
+
+	mPorts         sync.RWMutex
+	availablePorts map[int]struct{}
+
+	mBlocklist         sync.RWMutex
+	blocklist          *blocklist.Blocklist
+	blocklistTimestamp time.Time
+}
+
+// NewSession creates a new Session for downloading and seeding torrents.
+// Returned session must be closed after use.
+func NewSession(cfg Config) (*Session, error) {
+	if cfg.PortBegin >= cfg.PortEnd {
+		return nil, errors.New("invalid port range")
+	}
+	if cfg.MaxOpenFiles > 0 {
+		err := setNoFile(cfg.MaxOpenFiles)
+		if err != nil {
+			return nil, errors.New("cannot change max open files limit: " + err.Error())
+		}
+	}
+
+	if cfg.CustomLogHandler != nil {
+		logger.SetHandler(cfg.CustomLogHandler)
+	}
+	if cfg.Debug {
+		logger.SetDebug()
+	}
+
+	cfg.Database = os.ExpandEnv(cfg.Database)
+	cfg.DataDir = os.ExpandEnv(cfg.DataDir)
+	err := os.MkdirAll(filepath.Dir(cfg.Database), os.ModeDir|cfg.FilePermissions)
+	if err != nil {
+		return nil, err
+	}
+	l := logger.New("session")
+	db, err := bbolt.Open(cfg.Database, cfg.FilePermissions&^0111, &bbolt.Options{Timeout: time.Second})
+	if err == berrors.ErrTimeout {
+		return nil, errors.New("resume database is locked by another process")
+	} else if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			db.Close()
+		}
+	}()
+	var ids []string
+	err = db.Update(func(tx *bbolt.Tx) error {
+		_, err2 := tx.CreateBucketIfNotExists(sessionBucket)
+		if err2 != nil {
+			return err2
+		}
+		b, err2 := tx.CreateBucketIfNotExists(torrentsBucket)
+		if err2 != nil {
+			return err2
+		}
+		return b.ForEach(func(k, _ []byte) error {
+			ids = append(ids, string(k))
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	res, err := boltdbresumer.New(db, torrentsBucket)
+	if err != nil {
+		return nil, err
+	}
+	var dhtNode *dht.DHT
+	if cfg.DHTEnabled {
+		dhtConfig := dht.NewConfig()
+		dhtConfig.Address = cfg.DHTHost
+		dhtConfig.Port = int(cfg.DHTPort)
+		dhtConfig.DHTRouters = strings.Join(cfg.DHTBootstrapNodes, ",")
+		dhtConfig.SaveRoutingTable = false
+		dhtConfig.NumTargetPeers = 0
+		dhtNode, err = dht.New(dhtConfig)
+		if err != nil {
+			return nil, err
+		}
+		err = dhtNode.Start()
+		if err != nil {
+			return nil, err
+		}
+	}
+	ports := make(map[int]struct{})
+	for p := cfg.PortBegin; p < cfg.PortEnd; p++ {
+		ports[int(p)] = struct{}{}
+	}
+	bl := blocklist.NewLogger(l.Errorf)
+	var blTracker *blocklist.Blocklist
+	if cfg.BlocklistEnabledForTrackers {
+		blTracker = bl
+	}
+	c := &Session{
+		config:             cfg,
+		db:                 db,
+		resumer:            res,
+		blocklist:          bl,
+		trackerManager:     trackermanager.New(blTracker, cfg.DNSResolveTimeout, !cfg.TrackerHTTPVerifyTLS),
+		log:                l,
+		torrents:           make(map[string]*Torrent),
+		torrentsByInfoHash: make(map[dht.InfoHash][]*Torrent),
+		availablePorts:     ports,
+		dht:                dhtNode,
+		pieceCache:         piececache.New(cfg.ReadCacheSize, cfg.ReadCacheTTL, cfg.ParallelReads),
+		ram:                resourcemanager.New[*peer.Peer](cfg.WriteCacheSize),
+		createdAt:          time.Now(),
+		semWrite:           semaphore.New(int(cfg.ParallelWrites)),
+		closeC:             make(chan struct{}),
+		webseedClient: http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					ip, port, err := resolver.Resolve(ctx, addr, cfg.DNSResolveTimeout, bl)
+					if err != nil {
+						return nil, err
+					}
+					var d net.Dialer
+					taddr := &net.TCPAddr{IP: ip, Port: port}
+					dctx, cancel := context.WithTimeout(ctx, cfg.WebseedDialTimeout)
+					defer cancel()
+					return d.DialContext(dctx, network, taddr.String())
+				},
+				TLSHandshakeTimeout:   cfg.WebseedTLSHandshakeTimeout,
+				TLSClientConfig:       &tls.Config{InsecureSkipVerify: !cfg.WebseedVerifyTLS}, // nolint: gosec
+				ResponseHeaderTimeout: cfg.WebseedResponseHeaderTimeout,
+			},
+		},
+	}
+	if cfg.CustomStorage != nil {
+		c.storage = cfg.CustomStorage
+	} else {
+		c.storage = newFileStorageProvider(&cfg)
+	}
+	dlSpeed := cfg.SpeedLimitDownload * 1024
+	if cfg.SpeedLimitDownload > 0 {
+		c.bucketDownload = ratelimit.NewBucketWithRate(float64(dlSpeed), dlSpeed)
+	}
+	ulSpeed := cfg.SpeedLimitUpload * 1024
+	if cfg.SpeedLimitUpload > 0 {
+		c.bucketUpload = ratelimit.NewBucketWithRate(float64(ulSpeed), ulSpeed)
+	}
+	err = c.startBlocklistReloader()
+	if err != nil {
+		return nil, err
+	}
+	ext, err := bitfield.NewBytes(c.extensions[:], 64)
+	if err != nil {
+		panic(err)
+	}
+	ext.Set(61) // Fast Extension (BEP 6)
+	ext.Set(43) // Extension Protocol (BEP 10)
+	if cfg.DHTEnabled {
+		ext.Set(63) // DHT Protocol (BEP 5)
+		c.dhtPeerRequests = make(map[*torrent]struct{})
+	}
+	c.initMetrics()
+	c.loadExistingTorrents(ids)
+	if c.config.RPCEnabled {
+		c.rpc = newRPCServer(c)
+		err = c.rpc.Start(c.config.RPCHost, c.config.RPCPort)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if cfg.DHTEnabled {
+		go c.processDHTResults()
+	}
+	go c.updateStatsLoop()
+	return c, nil
+}
+
+func (s *Session) parseTrackers(tiers [][]string, private bool) []tracker.Tracker {
+	ret := make([]tracker.Tracker, 0, len(tiers))
+	for _, tier := range tiers {
+		trackers := make([]tracker.Tracker, 0, len(tier))
+		for _, tr := range tier {
+			t, err := s.trackerManager.Get(tr, s.config.TrackerHTTPTimeout, s.getTrackerUserAgent(private), int64(s.config.TrackerHTTPMaxResponseSize))
+			if err != nil {
+				continue
+			}
+			trackers = append(trackers, t)
+		}
+		if len(trackers) > 0 {
+			tra := tracker.NewTier(trackers)
+			ret = append(ret, tra)
+		}
+	}
+	return ret
+}
+
+func (s *Session) getTrackerUserAgent(private bool) string {
+	if private {
+		return s.config.TrackerHTTPPrivateUserAgent
+	}
+	return trackerHTTPPublicUserAgent
+}
+
+// Close stops all torrents and release the resources.
+// It waits for the "stopped" events to be announced to the trackers, at most for Config.TrackerStopTimeout.
+func (s *Session) Close() error {
+	close(s.closeC)
+
+	if s.config.DHTEnabled {
+		s.dht.Stop()
+	}
+
+	s.updateStats()
+
+	var wg sync.WaitGroup
+	s.mTorrents.Lock()
+	wg.Add(len(s.torrents))
+	for _, t := range s.torrents {
+		go func(t *Torrent) {
+			t.torrent.Close()
+			wg.Done()
+		}(t)
+	}
+	wg.Wait()
+	s.torrents = nil
+	s.mTorrents.Unlock()
+
+	if s.rpc != nil {
+		err := s.rpc.Stop(s.config.RPCShutdownTimeout)
+		if err != nil {
+			s.log.Errorln("cannot stop RPC server:", err.Error())
+		}
+	}
+
+	s.ram.Close()
+	s.pieceCache.Close()
+	// Announcers share the transports in trackerManager. Their timeout bounds the wait.
+	s.detachedAnnouncers.Wait()
+	s.trackerManager.Close()
+	s.metrics.Close()
+	return s.db.Close()
+}
+
+// ListTorrents returns all torrents in session as a slice.
+// The order of the torrents returned is different on each call.
+func (s *Session) ListTorrents() []*Torrent {
+	s.mTorrents.RLock()
+	defer s.mTorrents.RUnlock()
+	torrents := make([]*Torrent, 0, len(s.torrents))
+	for _, t := range s.torrents {
+		torrents = append(torrents, t)
+	}
+	return torrents
+}
+
+func (s *Session) getPort() (int, error) {
+	s.mPorts.Lock()
+	defer s.mPorts.Unlock()
+	for p := range s.availablePorts {
+		delete(s.availablePorts, p)
+		return p, nil
+	}
+	return 0, errors.New("no free port")
+}
+
+func (s *Session) releasePort(port int) {
+	s.mPorts.Lock()
+	defer s.mPorts.Unlock()
+	s.availablePorts[port] = struct{}{}
+}
+
+// GetTorrent by its id. Returns nil if torrent with id is not found.
+func (s *Session) GetTorrent(id string) *Torrent {
+	s.mTorrents.RLock()
+	defer s.mTorrents.RUnlock()
+	return s.torrents[id]
+}
+
+// RemoveTorrent removes the torrent from the session and delete its files.
+// A "stopped" event is announced to the trackers in the background; RemoveTorrent does not wait for it.
+// If the storage fails to delete the files, the torrent stays in the session in stopped state.
+func (s *Session) RemoveTorrent(id string, keepData bool) error {
+	t := s.GetTorrent(id)
+	if t == nil {
+		return nil
+	}
+	info := query(t.torrent, func() *metainfo.Info {
+		t.torrent.stop(nil)
+		return t.torrent.info
+	})
+	if r, ok := t.torrent.storage.(storage.Remover); ok {
+		var m *storage.Manifest
+		if info != nil {
+			mf := info.Manifest()
+			m = &mf
+		}
+		if err := r.Remove(m, keepData); err != nil {
+			err = fmt.Errorf("cannot remove torrent data: %w", err)
+			return errors.Join(err, s.resumer.WriteStarted(id, false))
+		}
+	}
+	removed, err := s.removeTorrentFromClient(t)
+	if removed {
+		t.torrent.Close()
+		s.releasePort(t.torrent.port)
+	}
+	return err
+}
+
+// removeTorrentFromClient returns false if t is already removed by a concurrent call.
+func (s *Session) removeTorrentFromClient(t *Torrent) (bool, error) {
+	id := t.torrent.id
+	s.mTorrents.Lock()
+	if s.torrents[id] != t {
+		s.mTorrents.Unlock()
+		return false, nil
+	}
+	t.torrent.log.Info("removing torrent")
+	delete(s.torrents, id)
+
+	// Delete from the list of torrents with same info hash
+	ih := dht.InfoHash(t.torrent.InfoHash())
+	a := s.torrentsByInfoHash[ih]
+	for i, it := range a {
+		if it == t {
+			a[i] = a[len(a)-1]
+			s.torrentsByInfoHash[ih] = a[:len(a)-1]
+			break
+		}
+	}
+	// Read the map while still holding the lock; it must not be accessed after
+	// Unlock since concurrent Add/Remove operations mutate it.
+	lastWithInfoHash := len(s.torrentsByInfoHash[ih]) == 0
+
+	// DHT.RemoveInfoHash below sends a message to DHT loop, hence it is blocking.
+	// We need to make sure that we are not holding any lock that cause a block in DHT loop.
+	// DHT.PeersRequestResults tries to hold the same lock (mTorrents) when a message is received from
+	// DHT.PeersRequestResults. That's why we are releasing the lock before calling DHT.RemoveInfoHash.
+	s.mTorrents.Unlock()
+
+	if s.config.DHTEnabled && lastWithInfoHash {
+		s.dht.RemoveInfoHash(string(ih))
+	}
+	return true, s.db.Update(func(tx *bbolt.Tx) error {
+		return tx.Bucket(torrentsBucket).DeleteBucket([]byte(id))
+	})
+}
+
+// StartAll starts all torrents in session.
+func (s *Session) StartAll() error {
+	err := s.db.Update(func(tx *bbolt.Tx) error {
+		tb := tx.Bucket(torrentsBucket)
+		s.mTorrents.RLock()
+		for _, t := range s.torrents {
+			b := tb.Bucket([]byte(t.torrent.id))
+			_ = b.Put([]byte("started"), []byte("true"))
+		}
+		defer s.mTorrents.RUnlock()
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// Snapshot the torrents under the lock, then start them without holding it.
+	// Start() blocks on an unbuffered channel until the torrent loop receives,
+	// so calling it under the lock could stall concurrent Add/Remove.
+	s.mTorrents.RLock()
+	torrents := make([]*Torrent, 0, len(s.torrents))
+	for _, t := range s.torrents {
+		torrents = append(torrents, t)
+	}
+	s.mTorrents.RUnlock()
+	for _, t := range torrents {
+		t.torrent.Start()
+	}
+	return nil
+}
+
+// StopAll stops all torrents in session.
+func (s *Session) StopAll() error {
+	err := s.db.Update(func(tx *bbolt.Tx) error {
+		tb := tx.Bucket(torrentsBucket)
+		s.mTorrents.RLock()
+		for _, t := range s.torrents {
+			b := tb.Bucket([]byte(t.torrent.id))
+			_ = b.Put([]byte("started"), []byte("false"))
+		}
+		defer s.mTorrents.RUnlock()
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// Snapshot the torrents under the lock, then stop them without holding it.
+	// Stop() blocks on an unbuffered channel until the torrent loop receives,
+	// so calling it under the lock could stall concurrent Add/Remove.
+	s.mTorrents.RLock()
+	torrents := make([]*Torrent, 0, len(s.torrents))
+	for _, t := range s.torrents {
+		torrents = append(torrents, t)
+	}
+	s.mTorrents.RUnlock()
+	for _, t := range torrents {
+		t.torrent.Stop()
+	}
+	return nil
+}

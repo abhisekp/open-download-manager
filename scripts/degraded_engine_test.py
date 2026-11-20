@@ -34,6 +34,8 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
     original_db = b'original deliberately corrupt database fixture' * 256
     (data / 'torrents.db').write_bytes(original_db)
     (data / 'addons/registry.json').write_text('invalid add-on registry fixture')
+    (data / 'history.json').write_text('invalid history fixture')
+    (data / 'appearance.json').write_text('invalid appearance fixture')
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     child = subprocess.Popen([str(pathlib.Path(args.exe).resolve()), '--no-browser', '--engine', 'odm-missing-test-engine', '--data-dir', str(data), '--downloads', str(root / 'files')], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
@@ -48,6 +50,7 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
     try:
         status = api('status')
         assert status['capabilities'] == {'http': True, 'torrents': False, 'ftp_sftp': False}
+        assert status['warnings']
         gid = api('add', {'url': f'http://127.0.0.1:{server.server_port}/healthy.bin'})['result']
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
@@ -65,7 +68,15 @@ with tempfile.TemporaryDirectory(prefix='odm-degraded-') as temp:
             assert error.code == 503
         assert (data / 'torrents.db').read_bytes() == original_db
         assert (data / 'addons/registry.json').read_text() == 'invalid add-on registry fixture'
-        print('PASS: HTTP works with corrupt torrent/add-on state; component data preserved and unavailable capabilities reported')
+        for route in ['history-export','preferences']:
+            try:
+                api(route)
+                raise AssertionError('Corrupt optional state treated as healthy')
+            except urllib.error.HTTPError as error:
+                assert error.code == 503
+        assert (data / 'history.json').read_text() == 'invalid history fixture'
+        assert (data / 'appearance.json').read_text() == 'invalid appearance fixture'
+        print('PASS: HTTP works with corrupt torrent/add-on/history/appearance state; original component data retained and failures reported')
     finally:
         api('quit', {})
         child.wait(timeout=20)

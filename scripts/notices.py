@@ -21,6 +21,9 @@ for module in modules:
     if not found:missing.append(module['Path']);continue
     parts.append('\n=== '+module['Path']+' '+module.get('Version','')+' ===\n')
     for f in sorted(found):parts.append(f.name+'\n'+f.read_text(encoding='utf-8',errors='replace')+'\n')
+    if module.get('Replace',{}).get('Dir'):
+        relative=path.resolve().relative_to(root).as_posix()
+        parts.append('ODM local source replacement: '+relative+'; see its source/license/patch documentation.\n')
     if module['Path']=='github.com/zalando/go-keyring':
         # This platform implementation has an Apache header in addition to the
         # module's root MIT license. Preserve its attribution without source.

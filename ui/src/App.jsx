@@ -5,6 +5,7 @@ import { TorrentTrackers } from "./TorrentTrackers.jsx";
 import { HttpQueue } from "./HttpQueue.jsx";
 import { SavedLogins } from "./SavedLogins.jsx";
 import { useAppearance, AppearanceSettings } from "./Appearance.jsx";
+import { HistoryExport } from "./HistoryExport.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -347,6 +348,11 @@ export function App() {
             {notice}
           </div>
         )}
+        {data.warnings?.map((message) => (
+          <p key={message} role="alert" className="alert">
+            {message}
+          </p>
+        ))}
         {view === "Queue & schedules" && (
           <HttpQueue api={api} refreshDownloads={refresh} />
         )}
@@ -609,6 +615,7 @@ export function App() {
             <AppearanceSettings appearance={appearance} />
             <BrowserConnections api={api} />
             <SavedLogins api={api} />
+            <HistoryExport api={api} />
             <label className="field">
               HTTP/FTP/SFTP download limit (bytes per second)
               <input

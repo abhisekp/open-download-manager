@@ -7,6 +7,7 @@ import sys
 from desktop_provenance import source_state, write
 
 root = pathlib.Path(__file__).resolve().parents[1]
+subprocess.run([sys.executable,str(root/'scripts/verify_rain_source.py')],check=True)
 resources = root / 'desktop' / 'resources'
 source = source_state(root)
 if os.environ.get('GITHUB_ACTIONS') == 'true' and source['dirty']:

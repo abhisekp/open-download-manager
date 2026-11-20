@@ -40,11 +40,13 @@ jobs:
         run: |
           test -z "$(git ls-files -z '*.go' | xargs -0 gofmt -l)"
           python3 -m unittest discover -s scripts -p "test_*.py"
+          python3 scripts/verify_rain_source.py
           go mod verify
           go vet ./...
           go test -race ./...
           go test -race -run TestNativeTrackerConcurrentDedupAndRemoval -count=25 .
           (cd internal/nettoolscompat && go test -race ./...)
+          (cd internal/raincompat && go test -race ./internal/announcer)
           go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
           npm audit --prefix ui --omit=dev --audit-level=high
       - name: Cross compile portable targets
@@ -125,6 +127,7 @@ jobs:
           npm ci --prefix ui --ignore-scripts
           npm run build --prefix ui
           go test ./...
+          (cd internal/raincompat && go test ./internal/announcer)
           go build -o odm-runtime.exe .
           python scripts/native_mode_test.py --exe odm-runtime.exe
           python scripts/lock_recovery_test.py --exe odm-runtime.exe

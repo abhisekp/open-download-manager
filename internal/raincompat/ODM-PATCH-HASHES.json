@@ -1,0 +1,6 @@
+{
+  "go.mod": "26fdaa2d016cb75bf05a84381a04e86df621ae0583a4a0242fbf84851a0463f8",
+  "go.sum": "9f33209b13cfabc0fbb163c99a18a220af872d36b5c6da14f8b44b0813ad1dfd",
+  "internal/announcer/periodic.go": "4ccd3ad511541b638511e31151663cfbe450cde1e9af77eb0c1efe732ecec9d0",
+  "internal/announcer/odm_shutdown_test.go": "ba2a6e9abca491aede85936027d4a3d6f0c9719113b86cc56e37d95459530ee1"
+}

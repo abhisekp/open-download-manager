@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/abhisekp/open-download-manager/internal/addons"
@@ -166,8 +167,7 @@ func main() {
 	addr := "http://" + listener.Addr().String()
 	history, err := openHistory(filepath.Join(*data, "history.json"))
 	if err != nil {
-		log.Print(err)
-		return
+		log.Print("Download history unavailable; original data retained and current downloads remain available")
 	}
 	app := &App{engine: engine, token: auth, host: listener.Addr().String(), downloads: *downloads, history: history, verifyGate: make(chan struct{}, 1)}
 	app.logins = savedLogins
@@ -249,6 +249,7 @@ type App struct {
 	addons                 *addons.Store
 	logins                 *credentials.Store
 	preferences            *Preferences
+	historyExportMu        sync.Mutex
 }
 
 func (a *App) handler() http.Handler {
@@ -257,6 +258,7 @@ func (a *App) handler() http.Handler {
 	mux.HandleFunc("/api/http-queue", a.httpQueueAPI)
 	mux.HandleFunc("/api/logins", a.loginsAPI)
 	mux.HandleFunc("/api/preferences", a.preferencesAPI)
+	mux.HandleFunc("/api/history-export", a.historyExportAPI)
 	mux.HandleFunc("/api/addons", a.addonsAPI)
 	mux.HandleFunc("/api/addons/", a.addonsAPI)
 	mux.HandleFunc("/api/", a.api)
@@ -308,17 +310,20 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 				all = append(all, rows...)
 			}
 			var historyErr error
+			warnings := []string{}
+			if a.history == nil {
+				warnings = append(warnings, "Saved history is unavailable. Original history data was retained; current downloads remain available.")
+			}
 			all, historyErr = a.history.merge(all)
 			if historyErr != nil {
-				http.Error(w, "Cannot persist download history", 500)
-				return
+				warnings = append(warnings, "History could not be saved. Current downloads remain available; check app data folder access.")
 			}
 			stats, _ := a.engine.Call(r.Context(), "getGlobalStat")
 			limit := uint64(0)
 			if a.engine.HTTP != nil {
 				limit = a.engine.HTTP.Limit()
 			}
-			respond(w, map[string]any{"downloads": all, "stats": stats, "directory": a.downloads, "version": version, "settings": map[string]any{"downloadLimit": strconv.FormatUint(limit, 10)}, "capabilities": map[string]bool{"http": a.engine.HTTP != nil || a.engine.ariaAvailable(), "torrents": a.engine.Native != nil, "ftp_sftp": a.engine.ariaAvailable()}})
+			respond(w, map[string]any{"downloads": all, "warnings": warnings, "stats": stats, "directory": a.downloads, "version": version, "settings": map[string]any{"downloadLimit": strconv.FormatUint(limit, 10)}, "capabilities": map[string]bool{"http": a.engine.HTTP != nil || a.engine.ariaAvailable(), "torrents": a.engine.Native != nil, "ftp_sftp": a.engine.ariaAvailable()}})
 			return
 		case "/api/extensions":
 			respond(w, []Manifest{trackerManifest})
@@ -452,8 +457,20 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if in.Action == "forget" && len(a.history.get(in.GID)) > 0 {
-			_, _ = a.engine.Call(r.Context(), method, in.GID)
-			e = a.history.forget(in.GID)
+			live, statusErr := a.engine.Call(r.Context(), "tellStatus", in.GID)
+			if statusErr == nil {
+				var state struct{ Status string }
+				if json.Unmarshal(live, &state) != nil || !terminalHistoryStatus(state.Status) {
+					http.Error(w, "Transfer is still pending or running; pause/remove it before forgetting its result", 400)
+					return
+				}
+			}
+			_, removeErr := a.engine.Call(r.Context(), method, in.GID)
+			if statusErr == nil && removeErr != nil {
+				e = removeErr
+			} else {
+				e = a.history.forget(in.GID)
+			}
 		} else {
 			out, e = a.engine.Call(r.Context(), method, in.GID)
 		}

@@ -12,7 +12,7 @@ The target is an independent IDM/FDM/MDM-style desktop download manager with a f
 | Scheduling | Persisted one-time native HTTP UTC starts with local-time UI, paused/overdue/crash recovery and real byte verification | Recurring windows, torrent/aria2 schedules and OS wake integration |
 | Speed controls | Persisted native HTTP and optional aria2 download limits, enforced separately | Native torrent download/upload limits, traffic modes and a shared application-wide budget |
 | File management | Startup destination, retain files on removal, first-file SHA-256 verification | Categories, safe rename, move, collision and disk-full handling |
-| History | Bounded durable JSON history and forget | Export, retention policy UI and crash window reduction |
+| History | Bounded durable history with recorded-time eviction, failed-write rollback, active-transfer protection and consented local JSON export with sensitive details excluded by default | Hosted acceptance, age-based retention policy UI, reviewed restore/import and crash window reduction |
 | Browser integration | Paired bridge; installed Firefox/Chrome/Edge tests pass; Firefox submitted awaiting review; Edge submitted In review; Safari source | Store review, signed marketplace install tests, native messaging and installer-assisted handoff; Chrome registration payment blocked |
 | Native desktop | Native window/tray, single instance, explicit background action and actual packaged runtime/transfer/quit tests on six x64/ARM64 targets | Native installer/update/uninstall integration, accessibility and notifications; 32-bit targets retain browser UI |
 | Media extraction | Not implemented | Explicit provider adapters, rights review, safe dependency management |
