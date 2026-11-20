@@ -13,7 +13,7 @@ import time
 import urllib.request
 
 
-def scenario(executable, replace_after_crash):
+def scenario(executable, replace_after_crash, chunk_delay):
     original = bytes(range(256)) * (9 * 4096)
     replacement = b'R' * len(original)
     generation = 0
@@ -50,7 +50,7 @@ def scenario(executable, replace_after_crash):
                 for offset in range(start, end + 1, 32768):
                     self.wfile.write(body[offset:min(end + 1, offset + 32768)])
                     self.wfile.flush()
-                    time.sleep(.02)
+                    time.sleep(chunk_delay)
             except (ConnectionError, OSError):
                 pass
 
@@ -82,15 +82,26 @@ def scenario(executable, replace_after_crash):
             return json.load(response)
 
     def wait_job(gid, condition):
-        deadline = time.monotonic() + 25
+        deadline = time.monotonic() + 120
+        idle_deadline = time.monotonic() + 30
+        previous = None
+        job = None
         while time.monotonic() < deadline:
             job = next(row for row in api('/api/http-queue')['jobs'] if row['id'] == gid)
+            progress = (job['status'], job['completed'], job['committed'])
+            if progress != previous:
+                previous = progress
+                idle_deadline = time.monotonic() + 30
             if condition(job):
                 return job
             if job['status'] == 'error':
                 raise RuntimeError('Native segmented transfer reported an error')
+            if time.monotonic() >= idle_deadline:
+                break
             time.sleep(.05)
-        raise RuntimeError('Native segmented transfer did not reach expected state')
+        # Only safe numerical/state diagnostics, never launch/pairing credentials.
+        detail = 'no status' if job is None else f"status={job['status']}, completed={job['completed']}/{job['total']}, committed={job['committed']}"
+        raise RuntimeError('Native segmented transfer did not reach expected state: ' + detail)
 
     try:
         start()
@@ -118,7 +129,7 @@ def scenario(executable, replace_after_crash):
             raise RuntimeError('Changed resource did not discard its old segment layout')
         api('/api/quit', {})
         process.wait(timeout=15)
-        print('PASS:', 'changed-resource isolation' if replace_after_crash else 'parallel checkpoint crash/resume', 'and exact file SHA-256.')
+        print('PASS:', 'changed-resource isolation' if replace_after_crash else 'parallel checkpoint crash/resume', 'and exact file SHA-256.', flush=True)
     finally:
         if process is not None and process.poll() is None:
             process.kill()
@@ -131,10 +142,14 @@ def scenario(executable, replace_after_crash):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--exe', required=True, type=pathlib.Path)
+    parser.add_argument('--chunk-delay', type=float, default=.02,
+                        help='Local fixture pacing; 0.11 exercises transfers longer than the old 25-second test deadline')
     args = parser.parse_args()
     executable = str(args.exe.resolve())
+    if not 0 <= args.chunk_delay <= .2:
+        parser.error('fixture chunk delay must be between 0 and 0.2 seconds')
     for replace in (False, True):
-        scenario(executable, replace)
+        scenario(executable, replace, args.chunk_delay)
 
 
 if __name__ == '__main__':
