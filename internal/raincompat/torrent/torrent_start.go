@@ -2,6 +2,7 @@ package torrent
 
 import (
 	"net"
+	"time"
 
 	"github.com/cenkalti/rain/v2/internal/acceptor"
 	"github.com/cenkalti/rain/v2/internal/allocator"
@@ -17,6 +18,9 @@ import (
 )
 
 func (t *torrent) start() {
+	if t.seedUntil > 0 && time.Now().Unix() >= t.seedUntil {
+		t.stopAfterDownload = true
+	}
 	// Do not start if already started.
 	if t.errC != nil {
 		return

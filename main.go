@@ -260,6 +260,7 @@ func (a *App) handler() http.Handler {
 	mux.HandleFunc("/api/preferences", a.preferencesAPI)
 	mux.HandleFunc("/api/history-export", a.historyExportAPI)
 	mux.HandleFunc("/api/torrent-limits", a.torrentLimitsAPI)
+	mux.HandleFunc("/api/torrent-seeding", a.torrentSeedingAPI)
 	mux.HandleFunc("/api/addons", a.addonsAPI)
 	mux.HandleFunc("/api/addons/", a.addonsAPI)
 	mux.HandleFunc("/api/", a.api)

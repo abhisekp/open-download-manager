@@ -65,6 +65,17 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		return
 	}
 	hasStarted = spec.Started
+	seedUntil, err := s.readSeedingDeadline(id)
+	if err != nil {
+		return nil, false, err
+	}
+	// ODM only restores seeding when it has a still-valid explicit deadline.
+	if seedUntil == 0 || time.Now().Unix() >= seedUntil {
+		spec.StopAfterDownload = true
+	}
+	if seedUntil > 0 && time.Now().Unix() >= seedUntil {
+		hasStarted = false
+	}
 	var info *metainfo.Info
 	var bf *bitfield.Bitfield
 	var private bool
@@ -115,6 +126,9 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		return
 	}
 	t.rawTrackers = spec.Trackers
+	initialized := make(chan struct{})
+	t.sendCommand(func() { t.seedUntil = seedUntil; close(initialized) })
+	<-initialized
 	t.rawWebseedSources = spec.URLList
 	go s.checkTorrent(t)
 	delete(s.availablePorts, spec.Port)

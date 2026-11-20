@@ -130,6 +130,7 @@ func (s *Session) updateStatsLoop() {
 func (s *Session) updateStats() {
 	s.mTorrents.RLock()
 	defer s.mTorrents.RUnlock()
+	var locked []*torrent
 	err := s.db.Update(func(tx *bbolt.Tx) error {
 		mb := tx.Bucket(torrentsBucket)
 		for _, t := range s.torrents {
@@ -140,14 +141,15 @@ func (s *Session) updateStats() {
 			_ = b.Put(boltdbresumer.Keys.SeededFor, []byte(time.Duration(t.torrent.seededFor.Count()).String()))
 
 			t.torrent.mBitfield.RLock()
+			locked = append(locked, t.torrent)
 			if t.torrent.bitfield != nil {
 				_ = b.Put(boltdbresumer.Keys.Bitfield, t.torrent.bitfield.Bytes())
 			}
 		}
 		return nil
 	})
-	for _, t := range s.torrents {
-		t.torrent.mBitfield.RUnlock()
+	for _, t := range locked {
+		t.mBitfield.RUnlock()
 	}
 	if err != nil {
 		s.log.Errorln("cannot update stats:", err.Error())

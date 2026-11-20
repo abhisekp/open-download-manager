@@ -1,6 +1,6 @@
 # Native torrent bandwidth
 
-In Settings, choose separate native torrent download and upload caps in whole KiB/s. Zero means unlimited; the supported range is 0–1048576. These are session-wide budgets shared by all native peers and webseeds, separate from native HTTP and optional FTP/SFTP engine limits. Torrents still stop on completion; this feature does not enable indefinite seeding.
+In Settings, choose separate native torrent download and upload caps in whole KiB/s. Zero means unlimited; the supported range is 0–1048576. These are session-wide budgets shared by all native peers and webseeds, separate from native HTTP and optional FTP/SFTP engine limits. Torrents stop on completion unless you approve a [bounded seeding session](SEEDING.md); upload caps also apply to those sessions.
 
 Changes apply to existing peers without reconnecting. Pending reservations wake on a change or shutdown. Saving the same values preserves the current budget instead of replenishing its burst. The limiter uses the existing [Go rate package](https://pkg.go.dev/golang.org/x/time/rate) with bounded 16–64 KiB bursts; buffered network data, protocol overhead and already permitted payload mean this is not an exact network-interface byte ceiling. Download caps govern consumed torrent payload; operating-system socket buffers can receive ahead. Deliberate webseed bandwidth waits do not consume the network read timeout.
 

@@ -192,6 +192,9 @@ func nativeStatus(s rain.Stats) string {
 	if s.Error != nil {
 		return "error"
 	}
+	if s.Status == rain.Seeding {
+		return "seeding"
+	}
 	if s.Bytes.Total > 0 && s.Bytes.Completed == s.Bytes.Total {
 		return "complete"
 	}
@@ -238,7 +241,7 @@ func (n *NativeTorrents) rows(method string) []json.RawMessage {
 	}
 	for _, t := range n.session.ListTorrents() {
 		s := nativeStatus(t.Stats())
-		if (method == "tellActive" && s == "active") || (method == "tellWaiting" && s == "paused") || (method == "tellStopped" && (s == "complete" || s == "error")) {
+		if (method == "tellActive" && (s == "active" || s == "seeding")) || (method == "tellWaiting" && s == "paused") || (method == "tellStopped" && (s == "complete" || s == "error")) {
 			out = append(out, n.row(t))
 		}
 	}

@@ -24,7 +24,7 @@ func (t *torrent) handleStopped() {
 }
 
 func (t *torrent) stopAndSetStoppedOnComplete() {
-	err := t.session.resumer.HandleStopAfterDownload(t.id)
+	err := t.session.resumer.WriteStarted(t.id, false)
 	if err != nil {
 		t.log.Errorf("cannot write status to resume db: %s", err)
 	}

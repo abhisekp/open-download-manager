@@ -7,6 +7,7 @@ import { SavedLogins } from "./SavedLogins.jsx";
 import { useAppearance, AppearanceSettings } from "./Appearance.jsx";
 import { HistoryExport } from "./HistoryExport.jsx";
 import { TorrentLimits } from "./TorrentLimits.jsx";
+import { TorrentSeeding } from "./TorrentSeeding.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -30,6 +31,7 @@ const name = (d) =>
   "Retrieving metadata…";
 const status = {
   active: "Downloading",
+  seeding: "Seeding",
   waiting: "Queued",
   scheduled: "Scheduled",
   paused: "Paused",
@@ -192,7 +194,10 @@ export function App() {
         name(d).toLowerCase().includes(search.toLowerCase()),
     ),
     d = rows.find((d) => d.gid === selected) || rows[0];
-  const count = (s) => data.downloads.filter((d) => d.status === s).length;
+  const count = (s) =>
+    data.downloads.filter(
+      (d) => d.status === s || (s === "active" && d.status === "seeding"),
+    ).length;
   async function importTorrent(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -256,7 +261,7 @@ export function App() {
             Verify checksum
           </button>
         )}
-        {["active", "waiting", "scheduled"].includes(d.status) && (
+        {["active", "seeding", "waiting", "scheduled"].includes(d.status) && (
           <button
             disabled={busy}
             onClick={() => act("control", { gid: d.gid, action: "pause" })}
@@ -427,8 +432,12 @@ export function App() {
                       </td>
                       <td>{size(row.totalLength)}</td>
                       <td>
-                        {row.status === "active"
-                          ? size(row.downloadSpeed) + "/s"
+                        {row.status === "active" || row.status === "seeding"
+                          ? size(
+                              row.status === "seeding"
+                                ? row.uploadSpeed
+                                : row.downloadSpeed,
+                            ) + "/s"
                           : "—"}
                       </td>
                     </tr>
@@ -515,6 +524,15 @@ export function App() {
                     gid={d.gid}
                     api={api}
                     suggestions={trackers}
+                  />
+                )}
+                {d.native && (
+                  <TorrentSeeding
+                    key={d.gid}
+                    gid={d.gid}
+                    api={api}
+                    onChange={refresh}
+                    lifecycle={d.torrentState}
                   />
                 )}
                 <p className="destination">

@@ -49,6 +49,7 @@ func (t *torrent) run() {
 		case pw := <-t.pieceWriterResultC:
 			t.handlePieceWriteDone(pw)
 		case now := <-t.seedDurationTicker.C:
+			t.enforceSeedingDeadline(now)
 			t.updateSeedDuration(now)
 		case pe := <-t.peerSnubbedC:
 			t.handlePeerSnubbed(pe)

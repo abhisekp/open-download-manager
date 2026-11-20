@@ -18,6 +18,7 @@ type TorrentTrackers struct {
 	MetadataReady bool     `json:"metadataReady"`
 	Private       bool     `json:"private"`
 	CanAdd        bool     `json:"canAdd"`
+	CanReplace    bool     `json:"canReplace"`
 	Reason        string   `json:"reason,omitempty"`
 	URLs          []string `json:"urls"`
 }
@@ -89,6 +90,7 @@ func (n *NativeTorrents) trackerState(gid string) (TorrentTrackers, error) {
 	out.MetadataReady = true
 	out.Private = stats.Private || meta.Info.Private != 0
 	out.CanAdd = !out.Private
+	out.CanReplace = !out.Private && stats.Status == rain.Stopped
 	if out.Private {
 		out.Reason = "Tracker changes are disabled for private torrents to preserve their tracker restrictions."
 	} else if !trackerEditReady(stats.Status) {
@@ -162,6 +164,39 @@ func (n *NativeTorrents) addTrackers(gid string, input []string, approved bool) 
 	return result, nil
 }
 
+func (n *NativeTorrents) replaceTrackers(gid string, expected, input []string, approved bool) (TorrentTrackers, error) {
+	if !approved {
+		return TorrentTrackers{}, errors.New("review and approve the complete replacement list first")
+	}
+	if expected == nil || input == nil || len(expected) > 128 || len(input) > 128 {
+		return TorrentTrackers{}, errors.New("provide the reviewed current and replacement lists, each at most 128 URLs")
+	}
+	seen := map[string]bool{}
+	for _, raw := range input {
+		value, err := trackerURL(raw)
+		if err != nil {
+			return TorrentTrackers{}, err
+		}
+		if seen[value] {
+			return TorrentTrackers{}, errors.New("remove duplicate tracker URLs before replacing")
+		}
+		seen[value] = true
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	state, err := n.trackerState(gid)
+	if err != nil {
+		return state, err
+	}
+	if !state.CanReplace {
+		return state, errors.New("replacement requires a fully paused public torrent with verified metadata")
+	}
+	if err = n.session.GetTorrent(gid).ReplaceTrackers(expected, input); err != nil {
+		return state, err
+	}
+	return n.trackerState(gid)
+}
+
 func persistTrackerBatch(urls []string, add func(string) error) TrackerUpdate {
 	out := TrackerUpdate{Added: []string{}, Skipped: []string{}}
 	for i, value := range urls {
@@ -199,11 +234,26 @@ func (a *App) torrentTrackersAPI(w http.ResponseWriter, r *http.Request) {
 		GID      string   `json:"gid"`
 		URLs     []string `json:"urls"`
 		Approved bool     `json:"approved"`
+		Action   string   `json:"action"`
+		Expected []string `json:"expected"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 72<<10))
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 544<<10))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&input) != nil || decoder.Decode(new(any)) != io.EOF {
 		http.Error(w, "invalid tracker request", 400)
+		return
+	}
+	if input.Action == "replace" {
+		result, err := a.engine.Native.replaceTrackers(input.GID, input.Expected, input.URLs, input.Approved)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		respond(w, result)
+		return
+	}
+	if input.Action != "" && input.Action != "add" {
+		http.Error(w, "unsupported tracker action", 400)
 		return
 	}
 	result, err := a.engine.Native.addTrackers(input.GID, input.URLs, input.Approved)

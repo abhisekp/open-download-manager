@@ -52,7 +52,7 @@ export function TorrentLimits({ api }) {
       <p>
         Live limits shared by native torrent peers and webseeds. Use 0 for
         unlimited. Values are KiB per second. HTTP/FTP/SFTP limits are separate.
-        Torrents still stop on completion.
+        Torrents stop on completion unless you approve a seeding session.
       </p>
       {loaded && (
         <form onSubmit={save}>
