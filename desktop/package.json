@@ -8,7 +8,7 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test policy.test.cjs",
+    "test": "node --test policy.test.cjs notifications.test.cjs",
     "smoke": "electron smoke.cjs"
   },
   "devDependencies": {

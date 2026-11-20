@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { app } = require('electron');
+const { app, Menu, Notification } = require('electron');
 // Keep test profile and downloads out of the real user's application data.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'odm-desktop-'));
 process.env.APPDATA = scratch;
@@ -17,7 +17,7 @@ app.setPath('downloads', path.join(scratch, 'downloads'));
 const watchdog = setTimeout(() => { console.error('Desktop smoke timed out'); app.exit(1); }, 45000);
 const packagedResources = process.argv[2] ? path.resolve(process.argv[2]) : undefined;
 const implementation = packagedResources ? path.join(packagedResources, 'app.asar', 'app.cjs') : './app.cjs';
-require(implementation).start(async ({ window, backend, address, show, quit }) => {
+require(implementation).start(async ({ window, backend, address, show, notifications, quit }) => {
   try {
     const prefs = window.webContents.getLastWebPreferences();
     assert.equal(prefs.sandbox, true);
@@ -38,6 +38,18 @@ require(implementation).start(async ({ window, backend, address, show, quit }) =
     show(); assert.equal(window.isVisible(), true);
     const reply = await fetch(address.origin + '/api/status', {headers:{Authorization:'Bearer '+address.token}});
     assert.equal(reply.status, 200);
+    const preference = Menu.getApplicationMenu().items.find(item => item.label === 'Settings').submenu.items[0];
+    assert.equal(preference.checked, false, 'notifications default off');
+    assert.equal(notifications.enabled, false);
+    assert.equal(preference.enabled, Notification.isSupported());
+    const notices = [];
+    if (preference.enabled) {
+      const nativeNotify = notifications.notify;
+      notifications.notify = body => { notices.push(body); nativeNotify(body); };
+      preference.click();
+      assert.equal(JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'notifications.json'), 'utf8')).enabled, true);
+      await notifications.setEnabled(true);
+    }
     const payload = Buffer.from('real desktop transfer fixture\n'.repeat(4096));
     const fixture = http.createServer((_request, response) => { response.writeHead(200, {'Content-Length': payload.length}); response.end(payload); });
     await new Promise(resolve => fixture.listen(0, '127.0.0.1', resolve));
@@ -54,6 +66,16 @@ require(implementation).start(async ({ window, backend, address, show, quit }) =
       }
       assert.ok(completed, 'desktop transfer completes');
       assert.deepEqual(fs.readFileSync(completed.files[0].path), payload);
+      if (preference.enabled) {
+        await notifications.tick(notifications.generation);
+        assert.deepEqual(notices, ['1 download completed.']);
+        await notifications.tick(notifications.generation);
+        assert.equal(notices.length, 1, 'completion not repeated');
+        preference.click();
+        assert.equal(notifications.enabled, false);
+        assert.equal(JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'notifications.json'), 'utf8')).enabled, false);
+        console.log('Native notification opt-in, real completion routing, deduplication and saved opt-out passed; OS banner delivery is not asserted.');
+      }
     } finally { fixture.closeAllConnections(); await new Promise(resolve => fixture.close(resolve)); }
     const data = path.join(scratch, 'OpenDownloadManager');
     backend.once('exit', code => {
@@ -68,6 +90,6 @@ require(implementation).start(async ({ window, backend, address, show, quit }) =
     clearTimeout(watchdog);
     quit();
   } catch (error) {
-    console.error(error.message); process.exitCode = 1; clearTimeout(watchdog); quit();
+    console.error(error.stack); process.exitCode = 1; clearTimeout(watchdog); quit();
   }
 }, packagedResources);

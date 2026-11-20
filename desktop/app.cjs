@@ -1,10 +1,11 @@
 'use strict';
 
-const { app, BrowserWindow, Menu, Tray, dialog, session, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, dialog, session, nativeImage, Notification } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 const { launchAddress, localResource, documentNavigation, dataPaths } = require('./policy.cjs');
+const { loadPreference, savePreference, readStatus, NotificationMonitor } = require('./notifications.cjs');
 
 // No renderer preload, Node bridge, arbitrary external navigation or shell handoff.
 async function start(onReady, testResources) {
@@ -25,6 +26,14 @@ async function start(onReady, testResources) {
   }
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }
   let window, tray, backend, address, stopping = false, exited = false;
+  let notifications;
+  const liveNotifications = new Set();
+  const closeNotifications = () => {
+    for (const note of liveNotifications) {
+      try { note.close(); } catch { /* A missing OS service must not block quit. */ }
+    }
+    liveNotifications.clear();
+  };
   const show = () => { if (window && !window.isDestroyed()) { window.show(); window.restore(); window.focus(); } };
   app.on('second-instance', show);
   app.on('activate', show);
@@ -34,6 +43,8 @@ async function start(onReady, testResources) {
   async function stop() {
     if (stopping) return;
     stopping = true;
+    notifications?.setEnabled(false);
+    closeNotifications();
     if (backend && !exited) {
       if (address) {
         try {
@@ -136,10 +147,41 @@ async function start(onReady, testResources) {
     });
     window.webContents.on('will-attach-webview', event => event.preventDefault());
     window.webContents.on('render-process-gone', () => fail('The application window stopped. Please reopen ODM. Your download data is retained.'));
+    const preferenceFile = path.join(app.getPath('userData'), 'notifications.json');
+    let notificationEnabled = false, notificationReadable = true;
+    try { notificationEnabled = loadPreference(preferenceFile); } catch { notificationReadable = false; }
+    notifications = new NotificationMonitor(signal => readStatus(address, signal), body => {
+      if (stopping || !Notification.isSupported()) return;
+      // Keep at most one live object; summaries avoid a toast for every job.
+      closeNotifications();
+      const note = new Notification({ title: 'Open Download Manager', body, silent: true });
+      liveNotifications.add(note);
+      note.on('click', show);
+      note.on('close', () => liveNotifications.delete(note));
+      note.on('failed', () => liveNotifications.delete(note));
+      note.show();
+    });
+    const notificationOption = {
+      label: 'Notify when downloads finish or fail', type: 'checkbox',
+      checked: notificationEnabled, enabled: notificationReadable && Notification.isSupported(),
+      click: item => {
+        try {
+          savePreference(preferenceFile, item.checked);
+          notificationEnabled = item.checked;
+          notifications.setEnabled(notificationEnabled);
+          if (!notificationEnabled) closeNotifications();
+        } catch {
+          item.checked = notificationEnabled;
+          dialog.showErrorBox('Open Download Manager', 'The notification preference could not be saved. Your previous setting was kept.');
+        }
+      },
+    };
     const menu = [
       ...(process.platform === 'darwin' ? [{ label: app.name, submenu: [{ role: 'about' }, { type: 'separator' }, { label: 'Quit Open Download Manager', click: () => app.quit() }] }] : []),
       { label: 'File', submenu: [{ label: 'Show downloads', click: show }, { label: 'Quit Open Download Manager', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() }] },
       { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+      { label: 'Settings', submenu: [notificationOption,
+        { label: notificationReadable ? 'Notifications hide file names and links' : 'Notification settings unavailable; original file kept', enabled: false }] },
       { label: 'View', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
@@ -155,8 +197,9 @@ async function start(onReady, testResources) {
     } catch { /* No tray service: closing the window still quits cleanly. */ }
     await window.loadURL(address.url);
     show();
+    notifications.setEnabled(notificationEnabled && notificationReadable && Notification.isSupported());
     // Test harness receives main-process objects; no renderer bridge is exposed.
-    if (onReady) await onReady({ window, backend, address, show, quit: () => app.quit() });
+    if (onReady) await onReady({ window, backend, address, show, notifications, quit: () => app.quit() });
   } catch {
     fail('ODM could not open its local download service. Another version may already be running. Close it, then try again.');
   }

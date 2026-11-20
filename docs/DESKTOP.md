@@ -6,6 +6,10 @@ The shell starts only its packaged backend; command-line URLs or arbitrary argum
 
 Data stays in the same `OpenDownloadManager` configuration directory as the portable backend. Downloads use the operating system's Downloads directory. Quit requests the authenticated shutdown API and waits up to ten seconds before forced termination. An unexpected backend exit closes the shell with an error. Existing backend lock/checkpoint recovery applies on the next launch. Starting the shell while a standalone backend owns the same profile is rejected; it cannot attach to an unknown process.
 
+## Notifications
+
+The Settings menu has an opt-in completion/failure notification switch, off by default. Notices contain generic counts only and clicking shows ODM. The preference persists locally; startup history is not replayed. See [NOTIFICATIONS.md](NOTIFICATIONS.md) for privacy, polling bounds, tests and platform limitations. OS banner delivery and installed Windows notification identity still require acceptance on installed systems.
+
 ## Build and exercise
 
 Use the Go/Node versions in CI and build the UI first:
@@ -43,7 +47,7 @@ macOS is direct download only. Apple Store enrollment, paid Apple Developer memb
 
 Native packages disable Electron's Node-as-executable mode, NODE_OPTIONS/NODE_EXTRA_CA_CERTS startup overrides, Node inspector arguments and extra file-protocol privileges. They load application code only from app.asar. Embedded ASAR validation is enabled on Windows/macOS, where Electron supports it; Linux retains the explicit lack of that validation. The build requires an explicit setting for every supported fuse and reads the actual executable back before accepting the package.
 
-The source smoke test uses the ordinary development Electron runtime. The separate packaged-executable test sets a harmless owned NODE_OPTIONS preload and ELECTRON_RUN_AS_NODE, then verifies the hardened application still starts as an app and never writes the preload's marker. It also checks isolated rendering, exact transfer bytes, saved state and clean exit. The hardening helper and all other build/test code are excluded from the four-file application archive.
+The source smoke test uses the ordinary development Electron runtime. The separate packaged-executable test sets a harmless owned NODE_OPTIONS preload and ELECTRON_RUN_AS_NODE, then verifies the hardened application still starts as an app and never writes the preload's marker. It also checks isolated rendering, exact transfer bytes, saved state and clean exit. The hardening helper and all other build/test code are excluded from the five-file application archive.
 
 Cookie encryption remains off because this application uses memory-only renderer sessions, not persistent browser cookie storage. The optional custom V8 snapshot is not enabled because it is not in the prebuilt runtime. macOS package-time ad-hoc signature repair permits runtime testing; it is not identified-publisher signing, notarization or Apple Store distribution. Fuses must be applied before any future publisher signature. Binary flags and a sidecar JSON record do not substitute for signed releases, runtime dependency inventory or a trusted updater.
 

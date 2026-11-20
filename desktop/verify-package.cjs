@@ -15,8 +15,8 @@ visit(path.join(__dirname, 'out'));
 assert.equal(archives.length, 1, 'exactly one native package');
 const archive = archives[0];
 const entries = listPackage(archive).map(name => name.replaceAll('\\', '/')).sort();
-assert.deepEqual(entries, ['/app.cjs', '/main.cjs', '/package.json', '/policy.cjs']);
-for (const name of ['app.cjs', 'main.cjs', 'policy.cjs']) {
+assert.deepEqual(entries, ['/app.cjs', '/main.cjs', '/notifications.cjs', '/package.json', '/policy.cjs']);
+for (const name of ['app.cjs', 'main.cjs', 'notifications.cjs', 'policy.cjs']) {
   assert.deepEqual(extractFile(archive, name), fs.readFileSync(path.join(__dirname, name)));
 }
 const resources = path.dirname(archive);
