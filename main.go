@@ -120,7 +120,7 @@ func main() {
 	} else {
 		defer savedLogins.Close()
 	}
-	httpConfig := transfers.Config{DataDir: *data, Downloads: *downloads}
+	httpConfig := transfers.Config{DataDir: *data, Downloads: *downloads, DefaultRetryLimit: 3}
 	if savedLogins != nil {
 		httpConfig.ValidateCredential = savedLogins.Validate
 		httpConfig.LookupCredential = savedLogins.Lookup
@@ -171,6 +171,10 @@ func main() {
 	}
 	app := &App{engine: engine, token: auth, host: listener.Addr().String(), downloads: *downloads, history: history, verifyGate: make(chan struct{}, 1)}
 	app.logins = savedLogins
+	app.preferences, err = openPreferences(filepath.Join(*data, "appearance.json"))
+	if err != nil {
+		log.Print("Appearance preferences unavailable; approved light appearance remains available")
+	}
 	app.addons, err = addons.Open(filepath.Join(*data, "addons"))
 	if err != nil {
 		log.Print("Add-on registry unavailable; ordinary downloads remain available")
@@ -244,6 +248,7 @@ type App struct {
 	bridge                 *Bridge
 	addons                 *addons.Store
 	logins                 *credentials.Store
+	preferences            *Preferences
 }
 
 func (a *App) handler() http.Handler {
@@ -251,6 +256,7 @@ func (a *App) handler() http.Handler {
 	mux.HandleFunc("/api/torrent-trackers", a.torrentTrackersAPI)
 	mux.HandleFunc("/api/http-queue", a.httpQueueAPI)
 	mux.HandleFunc("/api/logins", a.loginsAPI)
+	mux.HandleFunc("/api/preferences", a.preferencesAPI)
 	mux.HandleFunc("/api/addons", a.addonsAPI)
 	mux.HandleFunc("/api/addons/", a.addonsAPI)
 	mux.HandleFunc("/api/", a.api)

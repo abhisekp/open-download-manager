@@ -32,6 +32,10 @@ func TestHTTPQueueCapabilityAndStrictInput(t *testing.T) {
 		{`{"action":"settings","singleStream":true,"settings":{"concurrent":1,"perHost":1}}`, a.token, "", 400},
 		{`{"action":"add","url":"http://user:secret@example.invalid/file"}`, a.token, "", 400},
 		{`{"action":"add","url":"file:///private"}`, a.token, "", 400},
+		{`{"action":"add","url":"https://example.invalid/file","retryLimit":6}`, a.token, "", 400},
+		{`{"action":"add","url":"https://example.invalid/file","retryLimit":-1}`, a.token, "", 400},
+		{`{"action":"move","gid":"invalid","position":"first","retryLimit":0}`, a.token, "", 400},
+		{`{"action":"settings","retryLimit":3,"settings":{"concurrent":1,"perHost":1}}`, a.token, "", 400},
 		{`{"action":"settings","url":"http://example.invalid","settings":{"concurrent":1,"perHost":1}}`, a.token, "", 400},
 		{`{"action":"settings","settings":{"concurrent":1,"perHost":1}}`, a.token, "http://" + a.host, 200},
 	} {

@@ -256,14 +256,14 @@ func (m *Manager) segmentBody(parent context.Context, job Job, s Segment, file *
 		if parent.Err() != nil {
 			return parent.Err()
 		}
-		return errors.New("segmented HTTP connection failed; resume to retry")
+		return connectionError(err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode == 200 || response.StatusCode == 412 || response.StatusCode == 416 {
 		return errRestartStream
 	}
 	if response.StatusCode != 206 {
-		return fmt.Errorf("segment server returned status %d", response.StatusCode)
+		return responseError(response)
 	}
 	if response.Header.Get("ETag") != job.ETag {
 		return errRestartStream
@@ -303,7 +303,7 @@ func (m *Manager) segmentBody(parent context.Context, job Job, s Segment, file *
 			if parent.Err() != nil {
 				return parent.Err()
 			}
-			return errors.New("HTTP segment stalled; resume to retry")
+			return &transientError{message: "HTTP segment stalled; retry to continue"}
 		}
 		m.mu.Lock()
 		limiter := m.limiter
@@ -338,7 +338,7 @@ func (m *Manager) segmentBody(parent context.Context, job Job, s Segment, file *
 			if parent.Err() != nil {
 				return parent.Err()
 			}
-			return errors.New("HTTP segment interrupted; resume to retry")
+			return bodyError(readErr, "HTTP segment interrupted; retry to continue")
 		}
 	}
 	if offset != s.End+1 {

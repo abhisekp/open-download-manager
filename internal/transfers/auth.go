@@ -93,6 +93,8 @@ func (m *Manager) SetCredential(id, ref string) error {
 	job.Committed = 0
 	job.Total = 0
 	job.StartAt = 0
+	job.RetryAt = 0
+	job.RetryCount = 0
 	job.Status = "paused"
 	job.Error = ""
 	if err := m.save(); err != nil {

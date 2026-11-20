@@ -1,12 +1,12 @@
 # Production acceptance — in progress
 
-ODM is **not complete or production-ready**. The independent IDM/FDM/MDM product brief remains the target. A passing development build, a signed source tag or an experimental prerelease must not be presented as full product parity.
+ODM is **not complete or production-ready**. The independent IDM/FDM/MDM product brief remains the target. A passing development build, a signed source tag or an experimental prerelease must not be presented as full product parity. New bounded native HTTP retries and persistent light/dark/system appearance have local real-process/UI acceptance; their fresh platform workflow results must be read back before claiming hosted acceptance. See RETRIES.md and APPEARANCE.md.
 
 ## Delivery milestones
 
 | Milestone | Current implementation | Required acceptance |
 |---|---|---|
-| Reliable transfer core | Native torrents and HTTP/HTTPS, including three fixed ranges with per-range crash checkpoints and changed-resource isolation; optional aria2; local real-process integrity evidence | Segmented platform CI passed at `25bf50c`; HTTPS Basic saved logins locally verified on Windows; new OS-keyring platform acceptance, automatic retries, broader disk-full/origin/CDN matrix and real FTP/SFTP verification |
+| Reliable transfer core | Native segmented HTTP and torrents, HTTPS Basic OS-keyring accounts verified on Windows/Linux/both Macs at `0576649`; bounded retries with local real-process integrity/restart evidence | Fresh retry platform acceptance, broader disk-full/origin/CDN matrix and real FTP/SFTP verification |
 | Desktop application | Native window/tray, single instance and explicit background/quit; actual packaged runtime/transfer/quit CI passed on all six x64/ARM64 targets at `25bf50c`, including packaged Electron startup fuse readback and attempted environment bypass checks | Native install/update/uninstall, accessible keyboard journeys and notifications; Linux install paths must avoid spaces |
 | Add-on foundation | Signed local WASI resolvers, reviewed permissions, isolated workers, lifecycle/persistence and real resolver-to-download handoff; native tests passed | OS-enforced worker RSS limits and independent hardening |
 | Complete extension platform | Resolver SDK/API 1 and built-in tracker feed | Controlled provider networking/credentials, events/UI contributions, compatibility policy, richer examples and update distribution |

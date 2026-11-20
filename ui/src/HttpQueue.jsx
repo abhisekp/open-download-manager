@@ -2,11 +2,12 @@ import React, { useEffect, useState } from "react";
 import { JobLogin, websiteOrigin } from "./SavedLogins.jsx";
 
 const pending = (job) =>
-  ["waiting", "paused", "scheduled"].includes(job.status);
+  ["waiting", "paused", "scheduled", "retrying"].includes(job.status);
 const label = {
   waiting: "Queued",
   paused: "Paused",
   scheduled: "Scheduled",
+  retrying: "Waiting to retry",
   active: "Downloading",
   finalizing: "Finishing",
   error: "Failed",
@@ -26,6 +27,7 @@ export function HttpQueue({ api, refreshDownloads }) {
     [start, setStart] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [singleStream, setSingleStream] = useState(false);
+  const [retryLimit, setRetryLimit] = useState("3");
   const [logins, setLogins] = useState([]),
     [credentialRef, setCredentialRef] = useState("");
   useEffect(() => {
@@ -106,6 +108,7 @@ export function HttpQueue({ api, refreshDownloads }) {
         startAt: when,
         singleStream,
         credentialRef,
+        retryLimit: Number(retryLimit),
       },
       later
         ? "Schedule saved. ODM must be running to start the download."
@@ -243,6 +246,22 @@ export function HttpQueue({ api, refreshDownloads }) {
             </small>
           </div>
         )}
+        <label>
+          Automatic retries (0–5)
+          <input
+            type="number"
+            min="0"
+            max="5"
+            required
+            value={retryLimit}
+            onChange={(event) => setRetryLimit(event.target.value)}
+          />
+        </label>
+        <p>
+          Retry temporary connection failures and busy servers. Pausing cancels
+          pending retries. Login, certificate and invalid range errors require
+          attention.
+        </p>
         <label className="queue-check">
           <input
             type="checkbox"
@@ -294,7 +313,7 @@ export function HttpQueue({ api, refreshDownloads }) {
               <tr>
                 <th>Download</th>
                 <th>Status</th>
-                <th>Start time</th>
+                <th>Next start</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -304,10 +323,27 @@ export function HttpQueue({ api, refreshDownloads }) {
                 .map((job) => (
                   <tr key={job.id}>
                     <td>{job.name}</td>
-                    <td>{label[job.status] || job.status}</td>
                     <td>
-                      {job.status === "scheduled"
-                        ? new Date(job.startAt).toLocaleString()
+                      {label[job.status] || job.status}
+                      {job.error && (
+                        <small className="queue-retry-reason">
+                          {job.error}
+                        </small>
+                      )}
+                      {job.retryLimit > 0 && (
+                        <small>
+                          {" "}
+                          · {job.retryCount}/{job.retryLimit} retries used
+                        </small>
+                      )}
+                    </td>
+                    <td>
+                      {job.status === "scheduled" || job.status === "retrying"
+                        ? new Date(
+                            job.status === "retrying"
+                              ? job.retryAt
+                              : job.startAt,
+                          ).toLocaleString()
                         : "—"}
                     </td>
                     <td>
@@ -348,9 +384,12 @@ export function HttpQueue({ api, refreshDownloads }) {
                             </button>
                           </>
                         )}
-                        {["waiting", "scheduled", "active"].includes(
-                          job.status,
-                        ) && (
+                        {[
+                          "waiting",
+                          "scheduled",
+                          "active",
+                          "retrying",
+                        ].includes(job.status) && (
                           <button
                             disabled={busy}
                             aria-label={"Pause " + job.name}
@@ -359,7 +398,7 @@ export function HttpQueue({ api, refreshDownloads }) {
                             Pause
                           </button>
                         )}
-                        {["paused", "scheduled", "error"].includes(
+                        {["paused", "scheduled", "error", "retrying"].includes(
                           job.status,
                         ) && (
                           <button

@@ -1,5 +1,9 @@
 # Development verification — 2026-11-20
 
+Latest completed checkpoint before the retry/appearance batch: signed `057664978fe7a5af0b8048e308629ef1f2cf043a`. All five workflows passed: core `44669941352`, six native desktops `44669941147`, installed Firefox `44669941129`, release validation-only `44669941160`, MSIX validation-only `44669945367`. This includes real OS-keyring checks, the repeated tracker startup/edit race regression and clean-source native resource binding. The final Windows x64 candidate was downloaded; archive/resource hashes, embedded VCS revision and modified=false matched. Binary-mode govulncheck reported no vulnerabilities. Earlier checkpoint tables below are retained as historical evidence.
+
+The new automatic retry and appearance batch has full local Go race/vet, UI/Sites, Python and workflow-lint acceptance. Actual browser retry recovery, opt-out and pause checks passed with matching file bytes and source request counts. An actual app process was killed with a retry pending and recovered it after restart without repeating completed work. Appearance was restored after both page reload and a new app process, and system color-scheme changes were exercised. Fresh hosted acceptance for these additions is separate from the completed checkpoint above.
+
 This report covers local development evidence, not production or Store readiness. The public repository is https://github.com/abhisekp/open-download-manager. The user chose an independent implementation, MIT licensing, public source, and the final navy/cyan icon. MDM source and assets were not reused.
 
 ## Recorded CI checkpoints

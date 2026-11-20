@@ -42,6 +42,9 @@ type Job struct {
 	Connections   int       `json:"-"`
 	SingleStream  bool      `json:"singleStream,omitempty"`
 	CredentialRef string    `json:"credentialRef,omitempty"`
+	RetryLimit    int       `json:"retryLimit"`
+	RetryCount    int       `json:"retryCount"`
+	RetryAt       int64     `json:"retryAt,omitempty"`
 	Speed         int64     `json:"-"`
 }
 
@@ -55,6 +58,8 @@ type Config struct {
 	DataDir, Downloads string
 	Client             *http.Client
 	StallTimeout       time.Duration
+	DefaultRetryLimit  int
+	RetryBase          time.Duration
 	ValidateCredential func(string, string) error
 	LookupCredential   func(context.Context, string, string) (string, string, error)
 }
@@ -75,6 +80,8 @@ type Manager struct {
 	closeDone          chan struct{}
 	closeErr           error
 	stallTimeout       time.Duration
+	defaultRetryLimit  int
+	retryBase          time.Duration
 	queue              QueueSettings
 	validateCredential func(string, string) error
 	lookupCredential   func(context.Context, string, string) (string, string, error)
@@ -128,6 +135,15 @@ func Open(config Config) (*Manager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{root: root, dir: config.Downloads, registry: filepath.Join(config.DataDir, "http-transfers.json"), jobs: map[string]*Job{}, running: map[string]context.CancelFunc{}, limiter: rate.NewLimiter(rate.Inf, 32768), ctx: ctx, cancel: cancel, schedulerDone: make(chan struct{})}
 	m.closeDone = make(chan struct{})
+	fail := func(err error) (*Manager, error) { cancel(); _ = root.Close(); return nil, err }
+	if config.DefaultRetryLimit < 0 || config.DefaultRetryLimit > 5 {
+		return fail(errors.New("invalid automatic retry limit"))
+	}
+	m.defaultRetryLimit = config.DefaultRetryLimit
+	m.retryBase = config.RetryBase
+	if m.retryBase <= 0 || m.retryBase > 2*time.Second {
+		m.retryBase = 2 * time.Second
+	}
 	m.validateCredential = config.ValidateCredential
 	m.lookupCredential = config.LookupCredential
 	m.queue = QueueSettings{Concurrent: 3, PerHost: 3}
@@ -135,7 +151,6 @@ func Open(config Config) (*Manager, error) {
 	if m.stallTimeout <= 0 {
 		m.stallTimeout = 30 * time.Second
 	}
-	fail := func(err error) (*Manager, error) { cancel(); _ = root.Close(); return nil, err }
 	if config.Client != nil {
 		m.client = config.Client
 	} else {
@@ -179,11 +194,14 @@ func Open(config Config) (*Manager, error) {
 			if !validSegments(job) {
 				return fail(errors.New("invalid native HTTP segment checkpoint"))
 			}
+			if !validRetry(job) {
+				return fail(errors.New("invalid automatic retry checkpoint"))
+			}
 			if job.CredentialRef != "" && (!validCredentialRef(job.CredentialRef) || !credentialURL(job.URL)) {
 				return fail(errors.New("invalid saved login reference"))
 			}
 			switch job.Status {
-			case "complete", "error", "removed", "paused":
+			case "complete", "error", "removed", "paused", "retrying":
 			case "scheduled":
 				if job.StartAt == 0 {
 					return fail(errors.New("scheduled transfer has no start time"))
@@ -303,12 +321,20 @@ func (m *Manager) AddPlanned(raw string, startAt int64) (string, error) {
 }
 
 type AddOptions struct {
+	RetryLimit    *int
 	StartAt       int64
 	SingleStream  bool
 	CredentialRef string
 }
 
 func (m *Manager) AddWithOptions(raw string, options AddOptions) (string, error) {
+	retryLimit := m.defaultRetryLimit
+	if options.RetryLimit != nil {
+		retryLimit = *options.RetryLimit
+	}
+	if retryLimit < 0 || retryLimit > 5 {
+		return "", errors.New("choose between 0 and 5 automatic retries")
+	}
 	startAt := options.StartAt
 	if !validURL(raw) {
 		return "", errors.New("use an HTTP or HTTPS URL without embedded credentials")
@@ -362,7 +388,7 @@ func (m *Manager) AddWithOptions(raw string, options AddOptions) (string, error)
 		previousOrders[row.ID] = row.Order
 		m.jobs[row.ID].Order = i + 1
 	}
-	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: status, Created: time.Now().UnixNano(), Order: len(m.jobs) + 1, StartAt: startAt, SingleStream: options.SingleStream, CredentialRef: options.CredentialRef}
+	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: status, Created: time.Now().UnixNano(), Order: len(m.jobs) + 1, StartAt: startAt, SingleStream: options.SingleStream, CredentialRef: options.CredentialRef, RetryLimit: retryLimit}
 	if err = m.save(); err != nil {
 		delete(m.jobs, id)
 		for key, order := range previousOrders {
@@ -392,6 +418,7 @@ func (m *Manager) Control(id, action string) error {
 			return errors.New("completed transfer cannot be paused")
 		}
 		job.Status = "paused"
+		job.RetryAt = 0
 	case "unpause":
 		if job.Status == "complete" || job.Status == "removed" || job.Status == "finalizing" {
 			return errors.New("completed transfer cannot be resumed")
@@ -399,11 +426,14 @@ func (m *Manager) Control(id, action string) error {
 		job.Status = "waiting"
 		job.Error = ""
 		job.StartAt = 0
+		job.RetryAt = 0
+		job.RetryCount = 0
 	case "remove":
 		if job.Status == "finalizing" {
 			return errors.New("transfer is finalizing")
 		}
 		job.Status = "removed"
+		job.RetryAt = 0
 	case "removeDownloadResult":
 		if m.running[id] != nil && job.Status != "complete" {
 			return errors.New("pause or remove the transfer first")
@@ -444,13 +474,15 @@ func (m *Manager) schedule() {
 				if len(m.running) >= m.queue.Concurrent {
 					break
 				}
-				ready := row.Status == "waiting" || row.Status == "scheduled" && row.StartAt <= time.Now().UnixMilli()
+				ready := row.Status == "waiting" || row.Status == "scheduled" && row.StartAt <= time.Now().UnixMilli() || row.Status == "retrying" && row.RetryAt <= time.Now().UnixMilli()
 				if !ready || m.running[row.ID] != nil || hosts[queueHost(row.URL)] >= m.queue.PerHost {
 					continue
 				}
 				job := m.jobs[row.ID]
 				ctx, cancel := context.WithCancel(m.ctx)
 				job.Status = "active"
+				job.RetryAt = 0
+				job.Error = ""
 				m.running[row.ID] = cancel
 				if err := m.save(); err != nil {
 					job.Status = "error"
@@ -482,8 +514,10 @@ func (m *Manager) run(ctx context.Context, id string) {
 		if ctx.Err() != nil {
 			job.Status = "paused"
 		} else {
-			job.Status = "error"
-			job.Error = err.Error()
+			if !m.retry(job, err) {
+				job.Status = "error"
+				job.Error = err.Error()
+			}
 		}
 	}
 	job.Speed = 0

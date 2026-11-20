@@ -3,8 +3,8 @@
     Segoe UI,
     Arial,
     sans-serif;
-  color: #121a2a;
-  background: #fff;
+  color: var(--text, #121a2a);
+  background: var(--page, #fff);
   font-synthesis: none;
   font-size: 15px;
 }
@@ -34,9 +34,9 @@ textarea {
 }
 button {
   cursor: pointer;
-  border: 1px solid #cbd1da;
-  background: white;
-  color: #18202d;
+  border: 1px solid var(--border, #cbd1da);
+  background: var(--control, white);
+  color: var(--text, #18202d);
   border-radius: 9px;
   padding: 11px 17px;
   display: inline-flex;
@@ -46,7 +46,7 @@ button {
   font-weight: 600;
 }
 button:hover {
-  background: #f1f6ff;
+  background: var(--hover, #f1f6ff);
 }
 button:disabled {
   opacity: 0.5;
@@ -55,7 +55,7 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #225edb;
+  outline: 3px solid var(--focus, #225edb);
   outline-offset: 3px;
 }
 .primary {
@@ -73,8 +73,8 @@ textarea:focus-visible {
   grid-template-columns: 260px 1fr;
 }
 aside {
-  background: #fafbfc;
-  border-right: 1px solid #e0e4ea;
+  background: var(--surface, #fafbfc);
+  border-right: 1px solid var(--border, #e0e4ea);
   padding: 35px 12px;
   display: flex;
   flex-direction: column;
@@ -117,19 +117,19 @@ nav {
   min-width: 27px;
 }
 .nav.active {
-  color: #0659c8;
-  background: #dfecff;
+  color: var(--accent-text, #0659c8);
+  background: var(--selection, #dfecff);
 }
 .badge {
   margin-left: auto;
-  background: #c7ddff;
+  background: var(--badge, #c7ddff);
   padding: 2px 7px;
   border-radius: 5px;
 }
 .sidebar-foot {
   margin-top: auto;
   padding: 40px 17px 0;
-  color: #6b7481;
+  color: var(--muted, #6b7481);
   font-size: 13px;
 }
 .sidebar-foot small {
@@ -154,7 +154,7 @@ h1 {
   margin: 0 0 13px;
 }
 p {
-  color: #586170;
+  color: var(--muted, #586170);
   line-height: 1.6;
   margin: 7px 0;
 }
@@ -171,7 +171,7 @@ header .primary {
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #76808d;
+  color: var(--muted, #68727f);
   margin-bottom: 22px;
 }
 .toolbar label {
@@ -181,7 +181,7 @@ header .primary {
 }
 .toolbar input {
   border: 0;
-  background: #f7f9fc;
+  background: var(--subtle, #f7f9fc);
   border-radius: 7px;
   padding: 9px;
   width: 230px;
@@ -197,17 +197,17 @@ table {
   white-space: nowrap;
 }
 th {
-  color: #616a78;
+  color: var(--muted, #616a78);
   font-weight: 500;
   padding: 14px 12px;
-  border-bottom: 1px solid #d9dee7;
+  border-bottom: 1px solid var(--border, #d9dee7);
 }
 td {
   padding: 21px 12px;
-  border-bottom: 1px solid #e3e6ec;
+  border-bottom: 1px solid var(--border, #e3e6ec);
 }
 .selected {
-  background: #e4efff;
+  background: var(--selection, #e4efff);
 }
 .file {
   padding: 0;
@@ -228,10 +228,10 @@ td {
   display: block;
 }
 .status.active {
-  color: #0066db;
+  color: var(--accent-text, #0066db);
 }
 .status.complete {
-  color: #178548;
+  color: var(--success, #178548);
 }
 .status i {
   margin-right: 7px;
@@ -254,10 +254,10 @@ progress {
   border: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: #dce4f0;
+  background: var(--progress-track, #dce4f0);
 }
 progress::-webkit-progress-bar {
-  background: #dce4f0;
+  background: var(--progress-track, #dce4f0);
 }
 progress::-webkit-progress-value {
   background: #1174ee;
@@ -269,7 +269,7 @@ progress::-moz-progress-bar {
 .details {
   margin-top: 72px;
   padding: 28px 16px 0;
-  border-top: 1px solid #d8dde6;
+  border-top: 1px solid var(--border, #d8dde6);
 }
 .detail-heading {
   display: flex;
@@ -302,18 +302,18 @@ h2 {
 }
 .actions button:first-child {
   border-color: #4387ed;
-  background: #f4f8ff;
+  background: var(--subtle, #f4f8ff);
 }
 .big-progress {
   display: flex;
   gap: 22px;
   align-items: center;
   margin: 25px 0 11px;
-  color: #5c6471;
+  color: var(--muted, #5c6471);
 }
 .big-progress strong {
   font-size: 25px;
-  color: #111b2c;
+  color: var(--text, #111b2c);
 }
 .details > progress {
   height: 16px;
@@ -324,14 +324,14 @@ dl {
 }
 dl > div {
   padding: 0 32px;
-  border-left: 1px solid #e1e5ed;
+  border-left: 1px solid var(--border, #e1e5ed);
 }
 dl > div:first-child {
   padding-left: 0;
   border: 0;
 }
 dt {
-  color: #647080;
+  color: var(--muted, #647080);
   margin-bottom: 10px;
 }
 dd {
@@ -346,8 +346,8 @@ dd {
 footer {
   position: fixed;
   bottom: 0;
-  background: #fafbfc;
-  border-top: 1px solid #e0e4eb;
+  background: var(--surface, #fafbfc);
+  border-top: 1px solid var(--border, #e0e4eb);
   min-height: 52px;
   left: 0;
   right: 0;
@@ -355,7 +355,7 @@ footer {
   align-items: center;
   padding: 12px 25px;
   gap: 25px;
-  color: #596270;
+  color: var(--muted, #596270);
   font-size: 13px;
 }
 .footer-right {
@@ -379,13 +379,13 @@ footer {
   padding: 13px 17px;
   margin: 0 0 20px;
   border-radius: 8px;
-  background: #fff1ed;
-  color: #923a25;
+  background: var(--error-bg, #fff1ed);
+  color: var(--error-text, #923a25);
   overflow-wrap: anywhere;
 }
 .notice {
-  background: #eef8f1;
-  color: #236b42;
+  background: var(--notice-bg, #eef8f1);
+  color: var(--notice-text, #236b42);
 }
 .alert button {
   padding: 4px 8px;
@@ -421,7 +421,7 @@ input[type="checkbox"] {
 .boundary {
   margin-top: 40px;
   padding-top: 24px;
-  border-top: 1px solid #e1e5ed;
+  border-top: 1px solid var(--border, #e1e5ed);
 }
 .boundary h3 {
   font-size: 17px;
@@ -434,7 +434,7 @@ input[type="checkbox"] {
 }
 input,
 textarea {
-  border: 1px solid #cdd5e1;
+  border: 1px solid var(--border, #cdd5e1);
   padding: 12px;
   border-radius: 8px;
   max-width: 100%;
@@ -459,7 +459,7 @@ textarea {
   padding: 20px;
 }
 .dialog {
-  background: white;
+  background: var(--control, white);
   width: 560px;
   padding: 34px;
   border-radius: 16px;
@@ -534,7 +534,7 @@ textarea {
     min-height: 0;
     padding: 15px;
     border: 0;
-    border-bottom: 1px solid #e0e4ea;
+    border-bottom: 1px solid var(--border, #e0e4ea);
   }
   .brand {
     padding: 0 0 20px;
@@ -608,13 +608,13 @@ textarea {
 .addon-manager select {
   width: 100%;
   padding: 0.65rem;
-  border: 1px solid #8c9db7;
+  border: 1px solid var(--border, #8c9db7);
   border-radius: 0.4rem;
-  background: #fff;
-  color: #15273f;
+  background: var(--page, #fff);
+  color: var(--text, #15273f);
 }
 .addon-review {
-  border: 1px solid #8c9db7;
+  border: 1px solid var(--border, #8c9db7);
   border-radius: 0.6rem;
   padding: 1rem;
   margin: 1rem 0;
@@ -627,7 +627,7 @@ textarea {
   list-style: none;
 }
 .addon-list li {
-  border-bottom: 1px solid #d8e1ee;
+  border-bottom: 1px solid var(--border, #d8e1ee);
   padding: 1rem 0;
 }
 .addon-manager dt {
@@ -639,7 +639,7 @@ textarea {
 }
 .torrent-trackers {
   margin: 1.25rem 0;
-  border-top: 1px solid #d8e1ee;
+  border-top: 1px solid var(--border, #d8e1ee);
   padding-top: 1rem;
 }
 .torrent-trackers summary {
@@ -655,7 +655,7 @@ textarea {
 .torrent-trackers textarea {
   width: 100%;
   padding: 0.65rem;
-  border: 1px solid #8c9db7;
+  border: 1px solid var(--border, #8c9db7);
   border-radius: 0.4rem;
   font: inherit;
 }
@@ -677,7 +677,7 @@ textarea {
 }
 .queue-panel form {
   padding: 18px 0;
-  border-bottom: 1px solid #dce2eb;
+  border-bottom: 1px solid var(--border, #dce2eb);
 }
 .queue-panel h2 {
   font-size: 18px;
@@ -685,7 +685,7 @@ textarea {
 }
 .queue-panel p {
   line-height: 1.6;
-  color: #526079;
+  color: var(--muted, #526079);
 }
 .queue-panel label {
   display: grid;
@@ -694,7 +694,7 @@ textarea {
 }
 .queue-panel input {
   padding: 10px;
-  border: 1px solid #cdd6e4;
+  border: 1px solid var(--border, #cdd6e4);
   border-radius: 6px;
   font: inherit;
 }
@@ -715,16 +715,21 @@ textarea {
 .queue-actions button {
   font-size: 13px;
 }
+.queue-retry-reason {
+  display: block;
+  max-width: 32em;
+  margin-top: 6px;
+}
 .queue-panel select {
   font: inherit;
   padding: 10px;
-  border: 1px solid #cdd6e4;
+  border: 1px solid var(--border, #cdd6e4);
   border-radius: 6px;
-  background: white;
+  background: var(--control, white);
   max-width: 100%;
 }
 .saved-logins {
-  border-block: 1px solid #dce2eb;
+  border-block: 1px solid var(--border, #dce2eb);
   padding: 18px 0;
   margin: 20px 0;
 }
@@ -740,7 +745,7 @@ textarea {
 }
 .login-list li {
   padding: 14px 0;
-  border-bottom: 1px solid #dce2eb;
+  border-bottom: 1px solid var(--border, #dce2eb);
 }
 .login-list li > span {
   display: block;
@@ -752,4 +757,65 @@ textarea {
 }
 .job-login summary {
   cursor: pointer;
+}
+
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #101722;
+  --surface: #141e2c;
+  --control: #172435;
+  --text: #e8f0fa;
+  --muted: #b7c5d8;
+  --border: #40526b;
+  --hover: #253951;
+  --selection: #193a66;
+  --badge: #254a7d;
+  --accent-text: #a3c9ff;
+  --focus: #8ab9ff;
+  --subtle: #172c44;
+  --progress-track: #33465f;
+  --success: #6fe39c;
+  --error-bg: #45251f;
+  --error-text: #ffbdad;
+  --notice-bg: #163b29;
+  --notice-text: #8be4ae;
+}
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select {
+  background: var(--control);
+  color: var(--text);
+  border-color: var(--border);
+}
+select {
+  font: inherit;
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #a5b6cc;
+  opacity: 1;
+}
+select:focus-visible {
+  outline: 3px solid var(--focus, #225edb);
+  outline-offset: 3px;
+}
+.appearance-settings {
+  margin-bottom: 32px;
+}
+.appearance-settings select {
+  padding: 10px;
+  border-radius: 6px;
+  max-width: 320px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

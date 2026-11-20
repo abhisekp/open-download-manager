@@ -104,11 +104,11 @@ func (m *Manager) stream(parent context.Context, id string, allowSegments bool) 
 	}
 	response, err := m.client.Do(request)
 	if err != nil {
-		return errors.New("HTTP connection failed; check the address, TLS certificate and network")
+		return connectionError(err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusPartialContent {
-		return fmt.Errorf("HTTP server returned status %d", response.StatusCode)
+		return responseError(response)
 	}
 	if encoding := response.Header.Get("Content-Encoding"); encoding != "" && encoding != "identity" {
 		return errors.New("server returned unsupported content encoding")
@@ -216,7 +216,7 @@ func (m *Manager) stream(parent context.Context, id string, allowSegments bool) 
 	for {
 		if err = ctx.Err(); err != nil {
 			if parent.Err() == nil {
-				return errors.New("HTTP transfer stalled; resume to retry")
+				return &transientError{message: "HTTP transfer stalled; retry to continue"}
 			}
 			return err
 		}
@@ -274,9 +274,9 @@ func (m *Manager) stream(parent context.Context, id string, allowSegments bool) 
 		}
 		if readErr != nil {
 			if ctx.Err() != nil && parent.Err() == nil {
-				return errors.New("HTTP transfer stalled; resume to retry")
+				return &transientError{message: "HTTP transfer stalled; retry to continue"}
 			}
-			return errors.New("HTTP transfer interrupted; resume to retry")
+			return bodyError(readErr, "HTTP transfer interrupted; retry to continue")
 		}
 	}
 	if total > 0 && offset != total {

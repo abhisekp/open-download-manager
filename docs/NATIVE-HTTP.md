@@ -14,7 +14,7 @@ The HTTP transport retains its three-connections-per-destination cap. All worker
 
 ## Recovery and limitations
 
-Active transfers restore paused. Explicit Resume continues only synced, validated offsets. Source changes can require a full restart. Errors require user retry; bounded automatic backoff, authentication beyond the explicit [HTTPS Basic saved-login flow](SAVED-LOGINS.md), mirror downloads, dynamic re-splitting and a wider origin/CDN compatibility matrix remain work. Basic validators do not replace an expected cryptographic checksum from a trusted source.
+Active transfers restore paused. Explicit Resume continues only synced, validated offsets. Source changes can require a full restart. [Bounded automatic retries](RETRIES.md) recover eligible temporary failures; pending retries keep their durable due time across restart. Authentication beyond the explicit [HTTPS Basic saved-login flow](SAVED-LOGINS.md), mirror downloads, dynamic re-splitting and a wider origin/CDN compatibility matrix remain work. Basic validators do not replace an expected cryptographic checksum from a trusted source.
 
 Segment layout and the single-connection preference extend the existing development registry. Older builds that reject unknown fields cannot downgrade-read it. Keep an independent data backup when testing development upgrades/downgrades. The public v0.1.0-dev release does not contain this source.
 

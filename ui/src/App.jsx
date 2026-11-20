@@ -4,6 +4,7 @@ import { AddonManager } from "./AddonManager.jsx";
 import { TorrentTrackers } from "./TorrentTrackers.jsx";
 import { HttpQueue } from "./HttpQueue.jsx";
 import { SavedLogins } from "./SavedLogins.jsx";
+import { useAppearance, AppearanceSettings } from "./Appearance.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -95,6 +96,7 @@ export function App() {
     [notice, setNotice] = useState(""),
     [search, setSearch] = useState("");
   const [limitLoaded, setLimitLoaded] = useState(false);
+  const appearance = useAppearance(api);
   useEffect(() => {
     if (!limitLoaded && data.settings) {
       setLimit(data.settings.downloadLimit);
@@ -604,6 +606,7 @@ export function App() {
         {view === "Settings" && (
           <section className="settings">
             <h2>Transfer preferences</h2>
+            <AppearanceSettings appearance={appearance} />
             <BrowserConnections api={api} />
             <SavedLogins api={api} />
             <label className="field">

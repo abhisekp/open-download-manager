@@ -87,5 +87,5 @@ func (m *Manager) Move(id, position string) error {
 }
 
 func pending(status string) bool {
-	return status == "waiting" || status == "scheduled" || status == "paused"
+	return status == "waiting" || status == "scheduled" || status == "paused" || status == "retrying"
 }
