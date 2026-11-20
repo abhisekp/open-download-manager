@@ -25,23 +25,24 @@ import (
 )
 
 type Job struct {
-	ID           string    `json:"id"`
-	URL          string    `json:"url"`
-	Name         string    `json:"name"`
-	Status       string    `json:"status"`
-	Total        int64     `json:"total"`
-	Completed    int64     `json:"completed"`
-	Committed    int64     `json:"committed"`
-	ETag         string    `json:"etag"`
-	Modified     string    `json:"last_modified"`
-	Error        string    `json:"error"`
-	Created      int64     `json:"created"`
-	Order        int       `json:"order,omitempty"`
-	StartAt      int64     `json:"startAt,omitempty"`
-	Segments     []Segment `json:"segments,omitempty"`
-	Connections  int       `json:"-"`
-	SingleStream bool      `json:"singleStream,omitempty"`
-	Speed        int64     `json:"-"`
+	ID            string    `json:"id"`
+	URL           string    `json:"url"`
+	Name          string    `json:"name"`
+	Status        string    `json:"status"`
+	Total         int64     `json:"total"`
+	Completed     int64     `json:"completed"`
+	Committed     int64     `json:"committed"`
+	ETag          string    `json:"etag"`
+	Modified      string    `json:"last_modified"`
+	Error         string    `json:"error"`
+	Created       int64     `json:"created"`
+	Order         int       `json:"order,omitempty"`
+	StartAt       int64     `json:"startAt,omitempty"`
+	Segments      []Segment `json:"segments,omitempty"`
+	Connections   int       `json:"-"`
+	SingleStream  bool      `json:"singleStream,omitempty"`
+	CredentialRef string    `json:"credentialRef,omitempty"`
+	Speed         int64     `json:"-"`
 }
 
 type state struct {
@@ -54,25 +55,29 @@ type Config struct {
 	DataDir, Downloads string
 	Client             *http.Client
 	StallTimeout       time.Duration
+	ValidateCredential func(string, string) error
+	LookupCredential   func(context.Context, string, string) (string, string, error)
 }
 type Manager struct {
-	mu            sync.Mutex
-	root          *os.Root
-	dir, registry string
-	jobs          map[string]*Job
-	running       map[string]context.CancelFunc
-	client        *http.Client
-	limiter       *rate.Limiter
-	limit         uint64
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
-	schedulerDone chan struct{}
-	closed        bool
-	closeDone     chan struct{}
-	closeErr      error
-	stallTimeout  time.Duration
-	queue         QueueSettings
+	mu                 sync.Mutex
+	root               *os.Root
+	dir, registry      string
+	jobs               map[string]*Job
+	running            map[string]context.CancelFunc
+	client             *http.Client
+	limiter            *rate.Limiter
+	limit              uint64
+	ctx                context.Context
+	cancel             context.CancelFunc
+	wg                 sync.WaitGroup
+	schedulerDone      chan struct{}
+	closed             bool
+	closeDone          chan struct{}
+	closeErr           error
+	stallTimeout       time.Duration
+	queue              QueueSettings
+	validateCredential func(string, string) error
+	lookupCredential   func(context.Context, string, string) (string, string, error)
 }
 
 func validURL(raw string) bool {
@@ -123,6 +128,8 @@ func Open(config Config) (*Manager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{root: root, dir: config.Downloads, registry: filepath.Join(config.DataDir, "http-transfers.json"), jobs: map[string]*Job{}, running: map[string]context.CancelFunc{}, limiter: rate.NewLimiter(rate.Inf, 32768), ctx: ctx, cancel: cancel, schedulerDone: make(chan struct{})}
 	m.closeDone = make(chan struct{})
+	m.validateCredential = config.ValidateCredential
+	m.lookupCredential = config.LookupCredential
 	m.queue = QueueSettings{Concurrent: 3, PerHost: 3}
 	m.stallTimeout = config.StallTimeout
 	if m.stallTimeout <= 0 {
@@ -151,6 +158,9 @@ func Open(config Config) (*Manager, error) {
 		if len(via) > 0 && via[len(via)-1].URL.Scheme == "https" && request.URL.Scheme != "https" {
 			return errors.New("HTTPS downgrade redirect rejected")
 		}
+		if len(via) > 0 && requestOrigin(request.URL) != requestOrigin(via[0].URL) {
+			request.Header.Del("Authorization")
+		}
 		return nil
 	}
 	file, err := os.Open(m.registry)
@@ -168,6 +178,9 @@ func Open(config Config) (*Manager, error) {
 			}
 			if !validSegments(job) {
 				return fail(errors.New("invalid native HTTP segment checkpoint"))
+			}
+			if job.CredentialRef != "" && (!validCredentialRef(job.CredentialRef) || !credentialURL(job.URL)) {
+				return fail(errors.New("invalid saved login reference"))
 			}
 			switch job.Status {
 			case "complete", "error", "removed", "paused":
@@ -290,14 +303,23 @@ func (m *Manager) AddPlanned(raw string, startAt int64) (string, error) {
 }
 
 type AddOptions struct {
-	StartAt      int64
-	SingleStream bool
+	StartAt       int64
+	SingleStream  bool
+	CredentialRef string
 }
 
 func (m *Manager) AddWithOptions(raw string, options AddOptions) (string, error) {
 	startAt := options.StartAt
 	if !validURL(raw) {
 		return "", errors.New("use an HTTP or HTTPS URL without embedded credentials")
+	}
+	if options.CredentialRef != "" {
+		if !validCredentialRef(options.CredentialRef) || !credentialURL(raw) || m.validateCredential == nil || m.lookupCredential == nil {
+			return "", errors.New("choose an available saved login for this HTTPS website")
+		}
+		if err := m.validateCredential(options.CredentialRef, raw); err != nil {
+			return "", errors.New("saved login does not match this HTTPS website or is unavailable")
+		}
 	}
 	if startAt != 0 && (startAt <= time.Now().UnixMilli() || startAt > time.Now().AddDate(1, 0, 0).UnixMilli()) {
 		return "", errors.New("choose a future start time within one year")
@@ -340,7 +362,7 @@ func (m *Manager) AddWithOptions(raw string, options AddOptions) (string, error)
 		previousOrders[row.ID] = row.Order
 		m.jobs[row.ID].Order = i + 1
 	}
-	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: status, Created: time.Now().UnixNano(), Order: len(m.jobs) + 1, StartAt: startAt, SingleStream: options.SingleStream}
+	m.jobs[id] = &Job{ID: id, URL: raw, Name: name, Status: status, Created: time.Now().UnixNano(), Order: len(m.jobs) + 1, StartAt: startAt, SingleStream: options.SingleStream, CredentialRef: options.CredentialRef}
 	if err = m.save(); err != nil {
 		delete(m.jobs, id)
 		for key, order := range previousOrders {

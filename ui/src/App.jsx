@@ -3,6 +3,7 @@ import { BrowserConnections } from "./BrowserConnections.jsx";
 import { AddonManager } from "./AddonManager.jsx";
 import { TorrentTrackers } from "./TorrentTrackers.jsx";
 import { HttpQueue } from "./HttpQueue.jsx";
+import { SavedLogins } from "./SavedLogins.jsx";
 import "bootstrap-icons/font/bootstrap-icons.css";
 const I = ({ name }) => <i aria-hidden="true" className={"bi bi-" + name} />;
 const size = (n) => {
@@ -14,9 +15,11 @@ const size = (n) => {
       : (n / 1024).toFixed(1) + " KB";
 };
 const pct = (d) =>
-  d.status === "complete" ? 100 : Number(d.totalLength)
-    ? Math.min(100, (100 * Number(d.completedLength)) / Number(d.totalLength))
-    : 0;
+  d.status === "complete"
+    ? 100
+    : Number(d.totalLength)
+      ? Math.min(100, (100 * Number(d.completedLength)) / Number(d.totalLength))
+      : 0;
 const name = (d) =>
   d.bittorrent?.info?.name ||
   d.files?.[0]?.path?.split(/[\\/]/).pop() ||
@@ -93,7 +96,10 @@ export function App() {
     [search, setSearch] = useState("");
   const [limitLoaded, setLimitLoaded] = useState(false);
   useEffect(() => {
-    if (!limitLoaded && data.settings) { setLimit(data.settings.downloadLimit); setLimitLoaded(true); }
+    if (!limitLoaded && data.settings) {
+      setLimit(data.settings.downloadLimit);
+      setLimitLoaded(true);
+    }
   }, [limitLoaded, data.settings]);
   async function api(path, body) {
     const res = await fetch("/api/" + path, {
@@ -339,7 +345,9 @@ export function App() {
             {notice}
           </div>
         )}
-        {view === "Queue & schedules" && <HttpQueue api={api} refreshDownloads={refresh} />}
+        {view === "Queue & schedules" && (
+          <HttpQueue api={api} refreshDownloads={refresh} />
+        )}
         {["Downloads", "Torrents"].includes(view) && (
           <>
             <div className="toolbar">
@@ -485,10 +493,21 @@ export function App() {
                 {d.native && (
                   <p>
                     Native BitTorrent · {d.torrentState} ·{" "}
-                    {d.private ? "Private torrent" : d.metadataReady ? "Public torrent" : "Waiting for metadata"}
+                    {d.private
+                      ? "Private torrent"
+                      : d.metadataReady
+                        ? "Public torrent"
+                        : "Waiting for metadata"}
                   </p>
                 )}
-                {d.native && <TorrentTrackers key={d.gid} gid={d.gid} api={api} suggestions={trackers} />}
+                {d.native && (
+                  <TorrentTrackers
+                    key={d.gid}
+                    gid={d.gid}
+                    api={api}
+                    suggestions={trackers}
+                  />
+                )}
                 <p className="destination">
                   <I name="folder2" /> {data.directory}
                 </p>
@@ -586,6 +605,7 @@ export function App() {
           <section className="settings">
             <h2>Transfer preferences</h2>
             <BrowserConnections api={api} />
+            <SavedLogins api={api} />
             <label className="field">
               HTTP/FTP/SFTP download limit (bytes per second)
               <input
@@ -612,8 +632,28 @@ export function App() {
             </button>
             <div className="boundary">
               <h3>Download support</h3>
-              <p>HTTP/HTTPS: {data.capabilities?.http ? "Available" : "Unavailable"}. Torrents: {data.capabilities?.torrents ? "Available" : "Unavailable—preserve torrent data before recovery"}. FTP/SFTP: {data.capabilities?.ftp_sftp ? "Available" : "Requires the optional aria2 engine"}.</p>
-              <button disabled={busy} onClick={async () => { if (await act("engine-check", {})) setNotice("Optional engine check completed."); }}>Check optional engine</button>
+              <p>
+                HTTP/HTTPS:{" "}
+                {data.capabilities?.http ? "Available" : "Unavailable"}.
+                Torrents:{" "}
+                {data.capabilities?.torrents
+                  ? "Available"
+                  : "Unavailable—preserve torrent data before recovery"}
+                . FTP/SFTP:{" "}
+                {data.capabilities?.ftp_sftp
+                  ? "Available"
+                  : "Requires the optional aria2 engine"}
+                .
+              </p>
+              <button
+                disabled={busy}
+                onClick={async () => {
+                  if (await act("engine-check", {}))
+                    setNotice("Optional engine check completed.");
+                }}
+              >
+                Check optional engine
+              </button>
               <h3>Download folder</h3>
               <p>{data.directory}</p>
               <p>
@@ -628,9 +668,9 @@ export function App() {
               <h3>Session recovery</h3>
               <p>
                 Built-in HTTP downloads keep durable checkpoints and restart
-                paused after an interruption. Closing the browser leaves
-                downloads running. Stop the application with Ctrl+C in its
-                terminal to save and exit.
+                paused after an interruption. Use Quit in the desktop app to
+                save and exit. In portable browser mode, closing the tab leaves
+                downloads running; stop the application to exit.
               </p>
             </div>
           </section>
@@ -673,7 +713,7 @@ export function App() {
                 Cancel
               </button>
               <button className="primary" disabled={busy}>
-                {busy ? "Verifying�" : "Verify"}
+                {busy ? "Verifying…" : "Verify"}
               </button>
             </div>
           </form>

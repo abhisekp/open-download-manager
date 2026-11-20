@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { JobLogin, websiteOrigin } from "./SavedLogins.jsx";
 
 const pending = (job) =>
   ["waiting", "paused", "scheduled"].includes(job.status);
@@ -25,6 +26,8 @@ export function HttpQueue({ api, refreshDownloads }) {
     [start, setStart] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [singleStream, setSingleStream] = useState(false);
+  const [logins, setLogins] = useState([]),
+    [credentialRef, setCredentialRef] = useState("");
   useEffect(() => {
     let alive = true;
     const load = async (initial = false) => {
@@ -35,6 +38,12 @@ export function HttpQueue({ api, refreshDownloads }) {
         if (initial) {
           setConcurrent(String(d.settings.concurrent));
           setPerHost(String(d.settings.perHost));
+        }
+        try {
+          const saved = await api("logins");
+          if (alive) setLogins(saved.logins);
+        } catch {
+          if (alive) setLogins([]);
         }
       } catch (e) {
         if (alive) setError(e.message);
@@ -59,6 +68,7 @@ export function HttpQueue({ api, refreshDownloads }) {
       if (clearForm) {
         setURL("");
         setStart("");
+        setCredentialRef("");
       }
       setData(await api("http-queue"));
       await refreshDownloads();
@@ -90,7 +100,13 @@ export function HttpQueue({ api, refreshDownloads }) {
       return;
     }
     change(
-      { action: "add", url: url.trim(), startAt: when, singleStream },
+      {
+        action: "add",
+        url: url.trim(),
+        startAt: when,
+        singleStream,
+        credentialRef,
+      },
       later
         ? "Schedule saved. ODM must be running to start the download."
         : "Download added to the queue.",
@@ -192,10 +208,41 @@ export function HttpQueue({ api, refreshDownloads }) {
             required
             maxLength="8192"
             value={url}
-            onChange={(e) => setURL(e.target.value)}
+            onChange={(e) => {
+              setURL(e.target.value);
+              setCredentialRef("");
+            }}
             placeholder="https://example.com/file.zip"
           />
         </label>
+        {websiteOrigin(url) && (
+          <div>
+            <label htmlFor="queue-saved-login">Saved website login</label>
+            <select
+              id="queue-saved-login"
+              aria-describedby="queue-login-help"
+              value={credentialRef}
+              onChange={(e) => setCredentialRef(e.target.value)}
+            >
+              <option value="">No saved login</option>
+              {logins
+                .filter(
+                  (entry) =>
+                    entry.state === "ready" &&
+                    entry.origin === websiteOrigin(url),
+                )
+                .map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
+                ))}
+            </select>
+            <small id="queue-login-help">
+              Only logins for this HTTPS website are listed. Add them in
+              Settings.
+            </small>
+          </div>
+        )}
         <label className="queue-check">
           <input
             type="checkbox"
@@ -324,6 +371,14 @@ export function HttpQueue({ api, refreshDownloads }) {
                           </button>
                         )}
                       </div>
+                      {["paused", "error"].includes(job.status) && (
+                        <JobLogin
+                          job={job}
+                          logins={logins}
+                          busy={busy}
+                          change={change}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}

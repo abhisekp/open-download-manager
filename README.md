@@ -56,6 +56,8 @@ Go embeds the production React interface and exposes a narrow API bound to 127.0
 
 Only the local authenticated user may add URLs. Downloads deliberately allow local-network URLs; this is not safe to expose as a remote multi-user URL-fetching service. No shell commands or arbitrary engine RPC methods are exposed by the UI API. Engine configuration uses file permissions on Unix; Windows inherits the selected directory ACL. Keep the data directory user-private.
 
+HTTPS Basic website accounts can be saved in the device credential store and selected explicitly in Queue & schedules. See [saved logins](docs/SAVED-LOGINS.md) for scope, limits, recovery and platform requirements.
+
 See [ROADMAP](docs/ROADMAP.md), [release plan](docs/RELEASE.md), [extension contract](docs/EXTENSIONS.md), [MCP plan](docs/MCP.md), and [verification report](docs/VERIFICATION.md).
 
 ## License

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/abhisekp/open-download-manager/internal/addons"
+	"github.com/abhisekp/open-download-manager/internal/credentials"
 	"github.com/abhisekp/open-download-manager/internal/processutil"
 	"github.com/abhisekp/open-download-manager/internal/transfers"
 )
@@ -113,7 +114,18 @@ func main() {
 	}
 	engine := newEngine("", secret)
 	engine.Native = native
-	direct, err := transfers.Open(transfers.Config{DataDir: *data, Downloads: *downloads})
+	savedLogins, loginErr := credentials.Open(filepath.Join(*data, "login-references.json"), "org.opendownloadmanager.http-basic.v1", credentials.OSBackend{})
+	if loginErr != nil {
+		log.Print("Saved login references unavailable; downloads without a saved login remain available")
+	} else {
+		defer savedLogins.Close()
+	}
+	httpConfig := transfers.Config{DataDir: *data, Downloads: *downloads}
+	if savedLogins != nil {
+		httpConfig.ValidateCredential = savedLogins.Validate
+		httpConfig.LookupCredential = savedLogins.Lookup
+	}
+	direct, err := transfers.Open(httpConfig)
 	if err != nil {
 		log.Print("Native HTTP registry could not be opened; its data is retained for recovery")
 	} else {
@@ -158,6 +170,7 @@ func main() {
 		return
 	}
 	app := &App{engine: engine, token: auth, host: listener.Addr().String(), downloads: *downloads, history: history, verifyGate: make(chan struct{}, 1)}
+	app.logins = savedLogins
 	app.addons, err = addons.Open(filepath.Join(*data, "addons"))
 	if err != nil {
 		log.Print("Add-on registry unavailable; ordinary downloads remain available")
@@ -230,12 +243,14 @@ type App struct {
 	verifyGate             chan struct{}
 	bridge                 *Bridge
 	addons                 *addons.Store
+	logins                 *credentials.Store
 }
 
 func (a *App) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/torrent-trackers", a.torrentTrackersAPI)
 	mux.HandleFunc("/api/http-queue", a.httpQueueAPI)
+	mux.HandleFunc("/api/logins", a.loginsAPI)
 	mux.HandleFunc("/api/addons", a.addonsAPI)
 	mux.HandleFunc("/api/addons/", a.addonsAPI)
 	mux.HandleFunc("/api/", a.api)

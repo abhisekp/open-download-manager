@@ -25,13 +25,15 @@ func (a *App) httpQueueAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Action       string                  `json:"action"`
-		URL          string                  `json:"url"`
-		StartAt      int64                   `json:"startAt"`
-		SingleStream bool                    `json:"singleStream"`
-		GID          string                  `json:"gid"`
-		Position     string                  `json:"position"`
-		Settings     transfers.QueueSettings `json:"settings"`
+		Action        string                  `json:"action"`
+		URL           string                  `json:"url"`
+		StartAt       int64                   `json:"startAt"`
+		SingleStream  bool                    `json:"singleStream"`
+		CredentialRef string                  `json:"credentialRef"`
+		Approved      bool                    `json:"approved"`
+		GID           string                  `json:"gid"`
+		Position      string                  `json:"position"`
+		Settings      transfers.QueueSettings `json:"settings"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384))
 	decoder.DisallowUnknownFields()
@@ -43,19 +45,25 @@ func (a *App) httpQueueAPI(w http.ResponseWriter, r *http.Request) {
 	var gid string
 	switch in.Action {
 	case "add":
-		if in.GID != "" || in.Position != "" || in.Settings != (transfers.QueueSettings{}) {
+		if in.GID != "" || in.Position != "" || in.Approved || in.Settings != (transfers.QueueSettings{}) {
 			http.Error(w, "unexpected add fields", 400)
 			return
 		}
-		gid, err = m.AddWithOptions(in.URL, transfers.AddOptions{StartAt: in.StartAt, SingleStream: in.SingleStream})
+		gid, err = m.AddWithOptions(in.URL, transfers.AddOptions{StartAt: in.StartAt, SingleStream: in.SingleStream, CredentialRef: in.CredentialRef})
+	case "login":
+		if !in.Approved || in.URL != "" || in.StartAt != 0 || in.SingleStream || in.Position != "" || in.Settings != (transfers.QueueSettings{}) {
+			http.Error(w, "approve restarting this paused download with the selected login", 400)
+			return
+		}
+		err = m.SetCredential(in.GID, in.CredentialRef)
 	case "move":
-		if in.URL != "" || in.StartAt != 0 || in.SingleStream || in.Settings != (transfers.QueueSettings{}) {
+		if in.URL != "" || in.StartAt != 0 || in.SingleStream || in.CredentialRef != "" || in.Approved || in.Settings != (transfers.QueueSettings{}) {
 			http.Error(w, "unexpected move fields", 400)
 			return
 		}
 		err = m.Move(in.GID, in.Position)
 	case "settings":
-		if in.URL != "" || in.StartAt != 0 || in.SingleStream || in.GID != "" || in.Position != "" {
+		if in.URL != "" || in.StartAt != 0 || in.SingleStream || in.CredentialRef != "" || in.Approved || in.GID != "" || in.Position != "" {
 			http.Error(w, "unexpected settings fields", 400)
 			return
 		}

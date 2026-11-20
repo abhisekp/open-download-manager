@@ -9,6 +9,7 @@ require (
 	github.com/cenkalti/rain/v2 v2.5.1
 	github.com/gofrs/flock v0.13.2
 	github.com/tetratelabs/wazero v1.12.0
+	github.com/zalando/go-keyring v0.2.8
 	github.com/zeebo/bencode v1.0.0
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/time v0.16.0
@@ -18,6 +19,8 @@ require (
 	github.com/cenkalti/backoff/v7 v7.0.1 // indirect
 	github.com/creachadair/jrpc2 v1.3.6 // indirect
 	github.com/creachadair/mds v0.31.0 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/google/btree v1.1.3 // indirect

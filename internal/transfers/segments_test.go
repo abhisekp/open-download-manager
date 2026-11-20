@@ -275,7 +275,7 @@ func TestSegmentedChunkedRangeAndStall(t *testing.T) {
 	})
 	t.Run("stall", func(t *testing.T) {
 		server, _, _ := segmentFixture(t, payload, "stall", false)
-		m, err := Open(Config{DataDir: t.TempDir(), Downloads: t.TempDir(), StallTimeout: 150 * time.Millisecond})
+		m, err := Open(Config{DataDir: testDir(t), Downloads: testDir(t), StallTimeout: 150 * time.Millisecond})
 		if err != nil {
 			t.Fatal(err)
 		}

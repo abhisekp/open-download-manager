@@ -195,7 +195,7 @@ func TestQueueBoundsAndRollback(t *testing.T) {
 		t.Fatal("invalid reorder accepted")
 	}
 	old := m.registry
-	m.registry = filepath.Join(t.TempDir(), "missing", "state.json")
+	m.registry = filepath.Join(testDir(t), "missing", "state.json")
 	before := m.Jobs()
 	settings := m.QueueSettings()
 	if m.SetQueue(QueueSettings{1, 1}) == nil || m.Move(ids[1], "first") == nil {

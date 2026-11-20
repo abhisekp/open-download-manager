@@ -4,7 +4,7 @@ The target is an independent IDM/FDM/MDM-style desktop download manager with a f
 
 | Capability | Current milestone | Next acceptance gate |
 |---|---|---|
-| HTTP transfers | Native three-range and single-stream paths without aria2, TLS/redirect/Range/resource-change/interruption/checkpoint/collision tests, real pause/resume/integrity integration | Authentication UI/secure credential storage, bounded automatic retries and wider server/platform compatibility |
+| HTTP transfers | Native three-range and single-stream paths without aria2, TLS/redirect/Range/resource-change/interruption/checkpoint/collision tests, real pause/resume/integrity integration; explicit HTTPS Basic account selection | HTTPS Basic saved logins and OS keyring implemented with local Windows evidence; platform keyring acceptance, bounded automatic retries and wider server/platform compatibility |
 | Parallel transfer/resume | Three fixed native ranges for strong-validator resources ≥8 MiB, per-range crash checkpoints, safe changed-resource fallback and single-connection choice; optional aria2 parallel transfers | Dynamic splitting, mirrors and broader origin/CDN/platform compatibility |
 | Torrents/magnets | Native Rain integration, metadata import, local peer transfer, persistence and permission-gated public tracker additions | File selection, priorities, tracker removal/replacement, upload limits and public/private swarm matrix |
 | FTP/SFTP | Engine URI path accepted | Real protocol/authentication tests and credential storage design |

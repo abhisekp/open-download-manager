@@ -95,6 +95,9 @@ func (m *Manager) stream(parent context.Context, id string, allowSegments bool) 
 		return errors.New("invalid HTTP request")
 	}
 	request.Header.Set("Accept-Encoding", "identity")
+	if err = m.authorize(request, job); err != nil {
+		return err
+	}
 	if offset > 0 {
 		request.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 		request.Header.Set("If-Range", validator)

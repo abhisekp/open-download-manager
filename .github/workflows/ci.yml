@@ -58,7 +58,8 @@ jobs:
       - name: Real engine integration
         run: |
           sudo apt-get update
-          sudo apt-get install -y aria2 xdg-utils qemu-user
+          sudo apt-get install -y aria2 xdg-utils qemu-user dbus-x11 gnome-keyring
+          python3 scripts/os_keyring_check.py
           go build -o /tmp/odm .
           python3 scripts/smoke.py --exe /tmp/odm
           python3 scripts/smoke.py --exe /tmp/odm --native-http
@@ -128,3 +129,10 @@ jobs:
           python scripts/queue_integration.py --exe odm-runtime.exe
           python scripts/segmented_integration.py --exe odm-runtime.exe
           python scripts/degraded_engine_test.py --exe odm-runtime.exe
+      - name: Install private Linux credential test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dbus-x11 gnome-keyring
+      - name: Verify disposable OS keyring entry on native platform
+        run: python scripts/os_keyring_check.py

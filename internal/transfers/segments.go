@@ -248,6 +248,9 @@ func (m *Manager) segmentBody(parent context.Context, job Job, s Segment, file *
 	request.Header.Set("Accept-Encoding", "identity")
 	request.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, s.End))
 	request.Header.Set("If-Range", job.ETag)
+	if err := m.authorize(request, job); err != nil {
+		return err
+	}
 	response, err := m.client.Do(request)
 	if err != nil {
 		if parent.Err() != nil {

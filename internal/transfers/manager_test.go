@@ -20,7 +20,7 @@ import (
 
 func openTest(t *testing.T, client *http.Client) (*Manager, Config) {
 	t.Helper()
-	config := Config{DataDir: filepath.Join(t.TempDir(), "data"), Downloads: filepath.Join(t.TempDir(), "files"), Client: client}
+	config := Config{DataDir: filepath.Join(testDir(t), "data"), Downloads: filepath.Join(testDir(t), "files"), Client: client}
 	m, err := Open(config)
 	if err != nil {
 		t.Fatal(err)
@@ -41,6 +41,12 @@ func openTest(t *testing.T, client *http.Client) (*Manager, Config) {
 
 func cleanupTestChild(t *testing.T, dir string) {
 	t.Helper()
+	resolved, resolveErr := filepath.Abs(dir)
+	if resolveErr != nil {
+		t.Error(resolveErr)
+		return
+	}
+	dir = resolved
 	root, err := os.OpenRoot(filepath.Dir(dir))
 	if err != nil {
 		t.Error(err)
@@ -398,7 +404,7 @@ func TestTLSVerificationAndHTTPSDowngradeAreEnforced(t *testing.T) {
 }
 
 func TestCorruptOrUnsafeRegistryFailsWithoutTouchingUserFiles(t *testing.T) {
-	dir := t.TempDir()
+	dir := testDir(t)
 	downloads := filepath.Join(dir, "files")
 	data := filepath.Join(dir, "data")
 	if err := os.MkdirAll(data, 0700); err != nil {
@@ -453,7 +459,7 @@ func TestLongCollisionFilenameSurvivesRestart(t *testing.T) {
 func TestFinalizationRecoveryPreservesUnexpectedUserFile(t *testing.T) {
 	for _, existing := range []string{"", "unrelated user file"} {
 		t.Run(fmt.Sprintf("existing-%d", len(existing)), func(t *testing.T) {
-			dir := t.TempDir()
+			dir := testDir(t)
 			config := Config{DataDir: filepath.Join(dir, "data"), Downloads: filepath.Join(dir, "files")}
 			_ = os.MkdirAll(config.DataDir, 0700)
 			_ = os.MkdirAll(config.Downloads, 0700)
@@ -562,4 +568,14 @@ func TestAttachmentFilenameCannotEscapeDownloadRoot(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(filepath.Dir(config.Downloads), "outside.bin")); !os.IsNotExist(err) {
 		t.Fatal("attachment escaped download root")
 	}
+}
+
+// testDir confines cleanup to the exact directory allocated by the test
+// framework. Its bounded Windows retry also covers managers opened directly by
+// recovery tests, rather than only the shared openTest constructor.
+func testDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Cleanup(func() { cleanupTestChild(t, dir) })
+	return dir
 }
