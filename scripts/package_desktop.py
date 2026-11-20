@@ -3,10 +3,10 @@ import hashlib
 import json
 import pathlib
 import platform
-import subprocess
 import sys
 import tarfile
 import zipfile
+from desktop_provenance import verify
 
 root = pathlib.Path(__file__).resolve().parents[1]
 folders = list((root / 'desktop/out').iterdir())
@@ -14,6 +14,7 @@ if len(folders) != 1 or not folders[0].is_dir():
     raise RuntimeError('Expected exactly one packaged native application')
 folder = folders[0]
 metadata = json.loads((root / 'desktop/package.json').read_text())
+prepared = verify(root / 'desktop/resources')
 hardening = json.loads((folder / 'ODM-HARDENING.json').read_text())
 system = {'win32': 'windows', 'darwin': 'macos', 'linux': 'linux'}[sys.platform]
 arch = {'amd64': 'x64', 'x86_64': 'x64', 'arm64': 'arm64', 'aarch64': 'arm64'}[platform.machine().lower()]
@@ -32,7 +33,10 @@ else:
 digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 (destination / 'SHA256SUMS').write_text(f'{digest}  {archive.name}\n')
 (destination / 'candidate.json').write_text(json.dumps({
-    'source': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(),
+    'source': prepared['source']['revision'],
+    'sourceDirty': prepared['source']['dirty'],
+    'sourceInputSha256': prepared['source']['inputSha256'],
+    'preparedResourceSha256': prepared['resources'],
     'version': metadata['version'], 'platform': system, 'arch': arch,
     'electron': metadata['devDependencies']['electron'], 'sha256': digest,
     'artifact': archive.name, 'distribution': 'development-candidate',

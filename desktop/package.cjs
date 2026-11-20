@@ -9,6 +9,10 @@ if (!['win32', 'linux', 'darwin'].includes(platform) || !['x64', 'arm64'].includ
   throw new Error('This desktop runtime supports x64/arm64 only. Use the portable browser-interface build on other targets.');
 }
 const resources = path.join(__dirname, 'resources');
+// Same VERSION does not prove this backend embeds the current UI or source.
+execFileSync(process.platform === 'win32' ? 'python' : 'python3',
+  [path.join(__dirname, '../scripts/desktop_provenance.py'), '--verify', resources],
+  {stdio:'inherit', windowsHide:true});
 const version = fs.readFileSync(path.join(__dirname, '../VERSION'), 'utf8').trim();
 if (require('./package.json').version !== version || require('./package-lock.json').version !== version) throw new Error('Desktop metadata must match VERSION');
 for (const name of ['backend', 'odm-icon.png', 'ODM-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt']) {
@@ -25,7 +29,7 @@ packager({
   appVersion: require('./package.json').version, appBundleId: 'org.opendownloadmanager.desktop',
   out: path.join(__dirname, 'out'), overwrite: true, asar: true, prune: true,
   ignore: [/^\/(?:resources|out|node_modules)(?:\/|$)/, /(?:\.test\.cjs|smoke\.cjs|package\.cjs|hardening\.cjs|package-lock\.json)$/],
-  extraResource: ['backend', 'odm-icon.png', 'ODM-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt'].map(name => path.join(resources, name)),
+  extraResource: ['backend', 'odm-icon.png', 'ODM-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt', 'ODM-BUILD.json'].map(name => path.join(resources, name)),
 }).then(async packages => {
   for (const folder of packages) {
     const hardening = await require('./hardening.cjs').harden(folder, platform);

@@ -20,8 +20,14 @@ for (const name of ['app.cjs', 'main.cjs', 'policy.cjs']) {
   assert.deepEqual(extractFile(archive, name), fs.readFileSync(path.join(__dirname, name)));
 }
 const resources = path.dirname(archive);
-for (const name of ['ODM-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt', 'odm-icon.png']) {
+for (const name of ['ODM-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'THIRD-PARTY-GO-NOTICES.txt', 'odm-icon.png', 'ODM-BUILD.json']) {
   assert.deepEqual(fs.readFileSync(path.join(resources, name)), fs.readFileSync(path.join(__dirname, 'resources', name)));
+}
+const prepared = JSON.parse(fs.readFileSync(path.join(resources, 'ODM-BUILD.json'), 'utf8'));
+const crypto = require('node:crypto');
+for (const [name, expected] of Object.entries(prepared.resources)) {
+  const actual = crypto.createHash('sha256').update(fs.readFileSync(path.join(resources, name))).digest('hex');
+  assert.equal(actual, expected, 'prepared resource bytes: ' + name);
 }
 const runtime = process.platform === 'darwin' ? path.resolve(resources, '../../..') : path.dirname(resources);
 // Upstream runtime notices must survive packaging alongside the Mac app bundle.
