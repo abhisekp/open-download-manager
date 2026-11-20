@@ -4,6 +4,8 @@ This is the MIT-licensed runtime package subset of `github.com/cenkalti/rain/v2`
 
 ## Reviewed changes
 
+- `internal/storage/filestorage/filestorage.go`, original `odm_links_windows.go`/`odm_links_unix.go` helpers and `odm_safety_test.go`, plus `storage/storage.go`: rooted path operations, exclusive new-file creation, existing size/type/identity checks and hard-link refusal. No existing file is resized on a conflict. A typed error allows path-redacted recovery guidance. See [storage behavior and verification limits](../../docs/TORRENT-STORAGE.md).
+
 - `torrent/odm_trackers.go` and its original tests: reviewed exact-list replacement for paused public torrents, persisted in one database transaction before in-memory assignment. Stale lists, private/unknown metadata and running torrents are refused; save failure leaves the previous list active.
 - `torrent/session_stats.go`: unlock only bitfields whose locks were actually acquired. A failed database transaction previously caused a fatal unlock even before its callback ran; the closed-storage regression reproduced this crash before the fix.
 - `torrent/odm_seeding.go`, its original tests, `session_load.go`, `torrent.go`, `torrent_run.go`, `torrent_start.go` and `torrent_stop.go`: explicit, persisted, bounded sharing deadlines; expiry enforcement and safe default restoration. Normal completion no longer clears stop-on-complete intent. Legacy restored torrents without explicit seeding deadlines stop on completion. See [seeding behavior](../../docs/SEEDING.md).

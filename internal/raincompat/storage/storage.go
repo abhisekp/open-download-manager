@@ -12,6 +12,10 @@ import (
 // for this reason is treated as missing and downloaded, instead of failing the torrent.
 var ErrNotWritten = errors.New("storage: range not written")
 
+// ErrUnsafeDestination means existing filesystem state cannot safely be reused.
+// Callers can show recovery guidance without exposing private filesystem paths.
+var ErrUnsafeDestination = errors.New("storage: unsafe or conflicting destination")
+
 // Storage is an interface for reading/writing torrent files.
 type Storage interface {
 	// Open a file. If the file does not exist, it will be created.

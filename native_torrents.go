@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	rainlog "github.com/cenkalti/log"
+	rainstorage "github.com/cenkalti/rain/v2/storage"
 	rain "github.com/cenkalti/rain/v2/torrent"
 	"github.com/zeebo/bencode"
 	bolt "go.etcd.io/bbolt"
@@ -228,6 +229,9 @@ func (n *NativeTorrents) row(t *rain.Torrent) json.RawMessage {
 	message := ""
 	if s.Error != nil {
 		message = "Native torrent transfer failed; inspect source and storage availability."
+		if errors.Is(s.Error, rainstorage.ErrUnsafeDestination) {
+			message = "An existing file or link conflicts with this torrent. Original files were kept. Use a separate download folder and try again."
+		}
 	}
 	raw, _ := json.Marshal(map[string]any{"gid": t.ID(), "status": nativeStatus(s), "totalLength": strconv.FormatInt(s.Bytes.Total, 10), "completedLength": strconv.FormatInt(s.Bytes.Completed, 10), "downloadSpeed": strconv.Itoa(s.Speed.Download), "uploadSpeed": strconv.Itoa(s.Speed.Upload), "connections": strconv.Itoa(s.Peers.Total), "files": files, "bittorrent": map[string]any{"info": map[string]string{"name": s.Name}}, "infoHash": s.InfoHash.String(), "native": true, "torrentState": s.Status.String(), "metadataReady": s.Pieces.Total > 0, "private": s.Private, "errorMessage": message})
 	return raw
