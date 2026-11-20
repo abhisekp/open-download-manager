@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	rain "github.com/cenkalti/rain/v2/torrent"
 	"github.com/zeebo/bencode"
 )
 
@@ -51,7 +52,27 @@ func addTrackerFixtureTorrent(t *testing.T, native *NativeTorrents, private bool
 	if json.Unmarshal(raw, &gid) != nil {
 		t.Fatal("invalid fixture id")
 	}
+	deadline := time.Now().Add(10 * time.Second)
+	for !trackerEditReady(native.session.GetTorrent(gid).Stats().Status) {
+		if time.Now().After(deadline) {
+			t.Fatal("fixture torrent did not finish preparation")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	return gid
+}
+
+func TestTrackerEditsRequireStableLifecyclePhase(t *testing.T) {
+	for _, status := range []rain.Status{rain.DownloadingMetadata, rain.Allocating, rain.Verifying, rain.Status(100)} {
+		if trackerEditReady(status) {
+			t.Fatalf("unsafe tracker-edit phase accepted: %v", status)
+		}
+	}
+	for _, status := range []rain.Status{rain.Stopped, rain.Stopping, rain.Downloading, rain.Seeding} {
+		if !trackerEditReady(status) {
+			t.Fatalf("stable tracker-edit phase refused: %v", status)
+		}
+	}
 }
 
 func TestTrackerURLTrustBoundary(t *testing.T) {

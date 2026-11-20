@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode"
 
+	rain "github.com/cenkalti/rain/v2/torrent"
 	"github.com/zeebo/bencode"
 )
 
@@ -26,6 +27,14 @@ type TrackerUpdate struct {
 	Skipped   []string `json:"skipped"`
 	Remaining int      `json:"remaining"`
 	Error     string   `json:"error,omitempty"`
+}
+
+// Rain starts tracker announcers immediately when AddTracker runs during file
+// preparation. Those goroutines read the peer port before startAcceptor writes
+// it. Only edit after the run-loop Stats barrier reports a stable phase. ODM's
+// mutex also excludes concurrent Start/Stop while this check and edit execute.
+func trackerEditReady(status rain.Status) bool {
+	return status == rain.Stopped || status == rain.Stopping || status == rain.Downloading || status == rain.Seeding
 }
 
 func trackerURL(raw string) (string, error) {
@@ -82,6 +91,9 @@ func (n *NativeTorrents) trackerState(gid string) (TorrentTrackers, error) {
 	out.CanAdd = !out.Private
 	if out.Private {
 		out.Reason = "Tracker changes are disabled for private torrents to preserve their tracker restrictions."
+	} else if !trackerEditReady(stats.Status) {
+		out.CanAdd = false
+		out.Reason = "Torrent files are being prepared. Wait until preparation finishes or pause the torrent before changing trackers."
 	}
 	seen := map[string]bool{}
 	for _, tier := range append([][]string{{meta.Announce}}, meta.List...) {
