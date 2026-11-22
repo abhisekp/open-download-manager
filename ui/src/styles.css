@@ -632,7 +632,8 @@ select {
   margin: 1rem 0;
 }
 .addon-manager input[type="url"],
-.addon-manager select {
+.addon-manager select,
+.addon-manager textarea {
   width: 100%;
   padding: 0.65rem;
   border: 1px solid var(--border, #8c9db7);

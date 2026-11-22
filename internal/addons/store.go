@@ -236,6 +236,16 @@ type ResolveApproval struct {
 }
 
 func (s *Store) ResolveApproved(ctx context.Context, id, input string, approval ResolveApproval) ([]string, error) {
+	return s.executeApproved(ctx, id, input, approval, "url-resolver")
+}
+
+// FetchTrackers executes the fixed feed URL in the signed manifest. Results
+// are suggestions only; this capability cannot create transfers/edit torrents.
+func (s *Store) FetchTrackers(ctx context.Context, id string, approval ResolveApproval) ([]string, error) {
+	return s.executeApproved(ctx, id, "", approval, "tracker-provider")
+}
+
+func (s *Store) executeApproved(ctx context.Context, id, input string, approval ResolveApproval, capability string) ([]string, error) {
 	overall := 5 * time.Second
 	s.mu.RLock()
 	if s.entries[id].Manifest.API == 2 {
@@ -256,8 +266,16 @@ func (s *Store) ResolveApproved(ctx context.Context, id, input string, approval 
 	if !ok || !entry.Enabled {
 		return nil, errors.New("add-on is disabled or not installed")
 	}
+	if entry.Manifest.Capability != capability {
+		return nil, errors.New("add-on capability does not match this operation")
+	}
 	if len(entry.Manifest.NetworkHosts) > 0 && (!approval.Network || approval.Digest != entry.Digest) {
 		return nil, errors.New("network requests need approval for this exact add-on package; refresh and review its hosts again")
+	}
+	operation := "resolve"
+	if capability == "tracker-provider" {
+		input = entry.Manifest.FeedURL
+		operation = "trackers"
 	}
 	if !permitted(input, entry.Manifest.InputHosts) {
 		return nil, errors.New("input URL is outside approved hosts")
@@ -272,7 +290,7 @@ func (s *Store) ResolveApproved(ctx context.Context, id, input string, approval 
 	if err != nil {
 		return nil, err
 	}
-	body, err := json.Marshal(workerRequest{Module: pkg.Module, URL: input, API: entry.Manifest.API, NetworkHosts: entry.Manifest.NetworkHosts})
+	body, err := json.Marshal(workerRequest{Module: pkg.Module, URL: input, API: entry.Manifest.API, NetworkHosts: entry.Manifest.NetworkHosts, Operation: operation})
 	if err != nil {
 		return nil, err
 	}
@@ -291,26 +309,7 @@ func (s *Store) ResolveApproved(ctx context.Context, id, input string, approval 
 	if err != nil {
 		return nil, fmt.Errorf("add-on execution failed or exceeded limits")
 	}
-	var output struct {
-		URLs []string `json:"urls"`
-	}
-	d := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
-	d.DisallowUnknownFields()
-	if d.Decode(&output) != nil || d.Decode(new(any)) != io.EOF || len(output.URLs) == 0 || len(output.URLs) > 50 {
-		return nil, errors.New("invalid add-on response")
-	}
-	seen := map[string]bool{}
-	urls := make([]string, 0, len(output.URLs))
-	for _, raw := range output.URLs {
-		if !permitted(raw, entry.Manifest.OutputHosts) {
-			return nil, errors.New("resolved URL is outside approved hosts")
-		}
-		if !seen[raw] {
-			seen[raw] = true
-			urls = append(urls, raw)
-		}
-	}
-	return urls, nil
+	return decodeSuggestions(stdout.Bytes(), entry.Manifest)
 }
 
 type workerRequest struct {
@@ -318,6 +317,7 @@ type workerRequest struct {
 	URL          string   `json:"url"`
 	API          int      `json:"api,omitempty"`
 	NetworkHosts []string `json:"network_hosts,omitempty"`
+	Operation    string   `json:"operation,omitempty"`
 }
 
 // Worker provides WASI Preview 1 without mounts, environment or socket imports.
@@ -336,6 +336,12 @@ func worker(input io.Reader, output, errorOutput io.Writer, client *http.Client)
 	}
 	if request.API == 0 {
 		request.API = 1
+	}
+	if request.Operation == "" {
+		request.Operation = "resolve"
+	}
+	if (request.Operation != "resolve" && request.Operation != "trackers") || (request.Operation == "trackers" && request.API != 2) {
+		return errors.New("unsupported worker operation")
 	}
 	if (request.API != 1 && request.API != 2) || (request.API == 1 && len(request.NetworkHosts) > 0) || len(request.NetworkHosts) > 16 {
 		return errors.New("unsupported worker capability")
@@ -386,7 +392,7 @@ func worker(input io.Reader, output, errorOutput io.Writer, client *http.Client)
 			return err
 		}
 	}
-	body, _ := json.Marshal(map[string]any{"api": request.API, "operation": "resolve", "url": request.URL})
+	body, _ := json.Marshal(map[string]any{"api": request.API, "operation": request.Operation, "url": request.URL})
 	_, err := rt.InstantiateWithConfig(ctx, request.Module, wazero.NewModuleConfig().WithStdin(bytes.NewReader(body)).WithStdout(output).WithStderr(errorOutput))
 	return err
 }

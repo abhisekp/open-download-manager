@@ -12,16 +12,29 @@ export function AddonManager({ api, token, onAdded }) {
   const [url, setUrl] = useState("");
   const [links, setLinks] = useState([]);
   const [networkApproved, setNetworkApproved] = useState(false);
+  const [trackerSelected, setTrackerSelected] = useState("");
+  const [trackerApproved, setTrackerApproved] = useState(false);
+  const [trackerResult, setTrackerResult] = useState(null);
+  const providers = items.filter(
+    (item) => item.enabled && item.manifest.capability === "tracker-provider",
+  );
+  const currentProvider = providers.find(
+    (item) => item.manifest.id === trackerSelected,
+  );
+  const resolvers = items.filter(
+    (item) => item.enabled && item.manifest.capability === "url-resolver",
+  );
   const currentAddon = items.find((item) => item.manifest.id === selected);
   const networkHosts = currentAddon?.manifest.network_hosts || [];
   useEffect(() => {
     setNetworkApproved(false);
   }, [selected, url, currentAddon?.digest]);
   useEffect(() => {
-    if (
-      selected &&
-      !items.some((item) => item.enabled && item.manifest.id === selected)
-    ) {
+    setTrackerApproved(false);
+    setTrackerResult(null);
+  }, [trackerSelected, currentProvider?.digest]);
+  useEffect(() => {
+    if (selected && !resolvers.some((item) => item.manifest.id === selected)) {
       setSelected("");
       setLinks([]);
     }
@@ -63,7 +76,7 @@ export function AddonManager({ api, token, onAdded }) {
       <p>
         Install a signed .odmx package from a publisher you trust. Add-ons
         cannot access your files. Provider requests require declared public
-        HTTPS hosts and separate approval for each resolution.
+        HTTPS hosts and separate approval for each resolution or tracker fetch.
       </p>
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
@@ -79,6 +92,8 @@ export function AddonManager({ api, token, onAdded }) {
             setPreview(null);
             setApproved(false);
             setNetworkApproved(false);
+            setTrackerApproved(false);
+            setTrackerResult(null);
             if (next)
               perform(async () => {
                 if (next.size > 8 * 1024 * 1024)
@@ -98,10 +113,30 @@ export function AddonManager({ api, token, onAdded }) {
           </h3>
           <p>{preview.manifest.description}</p>
           <dl>
-            <dt>Receives full links from</dt>
-            <dd>{preview.manifest.input_hosts.join(", ")}</dd>
+            <dt>Capability</dt>
+            <dd>
+              {preview.manifest.capability === "tracker-provider"
+                ? "Tracker suggestions (no torrent changes)"
+                : "Download link resolver"}
+            </dd>
+            <dt>
+              {preview.manifest.capability === "tracker-provider"
+                ? "Signed feed URL"
+                : "Receives full links from"}
+            </dt>
+            <dd>
+              {preview.manifest.capability === "tracker-provider" ? (
+                <code>{preview.manifest.feed_url}</code>
+              ) : (
+                preview.manifest.input_hosts.join(", ")
+              )}
+            </dd>
             <dt>May suggest links to</dt>
-            <dd>{preview.manifest.output_hosts.join(", ")}</dd>
+            <dd>
+              {preview.manifest.capability === "tracker-provider"
+                ? "Tracker URLs across hosts; separately review before contacting them"
+                : (preview.manifest.output_hosts || []).join(", ")}
+            </dd>
             <dt>Public HTTPS provider hosts</dt>
             <dd>
               {preview.manifest.network_hosts?.length
@@ -119,7 +154,9 @@ export function AddonManager({ api, token, onAdded }) {
           </dl>
           <p>
             A valid signature verifies the key, not the publisher’s identity.
-            Input/output link permissions cover all ports on the listed hosts.
+            {preview.manifest.capability === "tracker-provider"
+              ? "Suggested trackers can use other hosts and ports. Fetching never contacts them."
+              : "Input/output link permissions cover all ports on the listed hosts."}
             Provider requests use HTTPS port 443 only. Existing add-on grants
             are revoked by an update.
           </p>
@@ -173,6 +210,8 @@ export function AddonManager({ api, token, onAdded }) {
                   const enabled = e.target.checked;
                   setLinks([]);
                   setNetworkApproved(false);
+                  setTrackerApproved(false);
+                  setTrackerResult(null);
                   const previous = items;
                   setItems((current) =>
                     current.map((row) =>
@@ -212,7 +251,7 @@ export function AddonManager({ api, token, onAdded }) {
           </li>
         ))}
       </ul>
-      {items.some((item) => item.enabled) && (
+      {resolvers.length > 0 && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -243,17 +282,14 @@ export function AddonManager({ api, token, onAdded }) {
                 setSelected(e.target.value);
                 setLinks([]);
                 setNetworkApproved(false);
-                setNetworkApproved(false);
               }}
             >
               <option value="">Choose an enabled add-on</option>
-              {items
-                .filter((item) => item.enabled)
-                .map((item) => (
-                  <option key={item.manifest.id} value={item.manifest.id}>
-                    {item.manifest.name}
-                  </option>
-                ))}
+              {resolvers.map((item) => (
+                <option key={item.manifest.id} value={item.manifest.id}>
+                  {item.manifest.name}
+                </option>
+              ))}
             </select>
           </label>
           <label>
@@ -298,6 +334,113 @@ export function AddonManager({ api, token, onAdded }) {
             Review resolved links
           </button>
         </form>
+      )}
+      {providers.length > 0 && (
+        <section aria-label="Tracker-provider add-ons">
+          <h3>Fetch tracker suggestions</h3>
+          <p>
+            Provider add-ons fetch their signed feed URL. Suggestions do not
+            contact trackers or change any torrent. Review and apply selected
+            URLs separately in a public torrent’s tracker controls.
+          </p>
+          <label>
+            Tracker provider
+            <select
+              value={trackerSelected}
+              disabled={busy}
+              onChange={(e) => {
+                setTrackerSelected(e.target.value);
+                setTrackerApproved(false);
+                setTrackerResult(null);
+              }}
+            >
+              <option value="">Choose an enabled tracker provider</option>
+              {providers.map((item) => (
+                <option key={item.manifest.id} value={item.manifest.id}>
+                  {item.manifest.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {currentProvider && (
+            <>
+              <p>
+                Feed: <code>{currentProvider.manifest.feed_url}</code>
+              </p>
+              <p>
+                This fetch may contact{" "}
+                {(currentProvider.manifest.network_hosts || []).join(", ")}. The
+                provider can see your network address. No download link, torrent
+                identifier, cookies or saved account credentials are supplied.
+              </p>
+              <label className="permission">
+                <input
+                  type="checkbox"
+                  checked={trackerApproved}
+                  disabled={busy}
+                  onChange={(e) => setTrackerApproved(e.target.checked)}
+                />
+                Allow this tracker fetch for this exact package
+              </label>
+            </>
+          )}
+          <button
+            disabled={busy || !currentProvider || !trackerApproved}
+            onClick={() =>
+              perform(async () => {
+                const reviewed = currentProvider;
+                setTrackerResult(null);
+                try {
+                  const result = await api("addons/trackers", {
+                    id: reviewed.manifest.id,
+                    networkApproved: trackerApproved,
+                    digest: reviewed.digest,
+                  });
+                  if (
+                    result.packageDigest !== reviewed.digest ||
+                    result.addonId !== reviewed.manifest.id
+                  )
+                    throw new Error(
+                      "Tracker response does not match the reviewed package",
+                    );
+                  setTrackerResult({
+                    name: reviewed.manifest.name,
+                    digest: reviewed.digest,
+                    trackers: result.trackers,
+                  });
+                } finally {
+                  setTrackerApproved(false);
+                }
+              })
+            }
+          >
+            Fetch reviewed tracker suggestions
+          </button>
+          {trackerResult && (
+            <section aria-label="Fetched tracker suggestions">
+              <p role="status">
+                {trackerResult.trackers.length} tracker suggestions from{" "}
+                {trackerResult.name}. No torrents changed.
+              </p>
+              <details>
+                <summary>Fetched package fingerprint</summary>
+                <code>{trackerResult.digest}</code>
+              </details>
+              <label>
+                Tracker suggestions
+                <textarea
+                  readOnly
+                  rows={8}
+                  value={trackerResult.trackers.join("\n")}
+                />
+              </label>
+              <p>
+                Copy only the URLs you want to review in a public torrent’s
+                tracker controls.
+              </p>
+            </section>
+          )}
+        </section>
       )}
       {!!links.length && (
         <section aria-label="Resolved links">

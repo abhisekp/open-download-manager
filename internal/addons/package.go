@@ -14,6 +14,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 const MaxPackage = 8 << 20
@@ -28,6 +29,7 @@ type Manifest struct {
 	InputHosts   []string `json:"input_hosts"`
 	OutputHosts  []string `json:"output_hosts"`
 	NetworkHosts []string `json:"network_hosts,omitempty"`
+	FeedURL      string   `json:"feed_url,omitempty"`
 	ModuleHash   string   `json:"module_sha256"`
 	LicenseHash  string   `json:"license_sha256"`
 }
@@ -52,7 +54,7 @@ var semver = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9
 var hostname = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$`)
 
 func (m Manifest) Validate() error {
-	if (m.API != 1 && m.API != 2) || len(m.ID) > 100 || !identifier.MatchString(m.ID) || len(m.Name) < 1 || len(m.Name) > 80 || len(m.Description) > 1000 || len(m.Version) > 32 || !semver.MatchString(m.Version) || m.Capability != "url-resolver" {
+	if (m.API != 1 && m.API != 2) || len(m.ID) > 100 || !identifier.MatchString(m.ID) || len(m.Name) < 1 || len(m.Name) > 80 || len(m.Description) > 1000 || len(m.Version) > 32 || !semver.MatchString(m.Version) || (m.Capability != "url-resolver" && m.Capability != "tracker-provider") {
 		return errors.New("unsupported add-on manifest, version or capability")
 	}
 	if len(m.ModuleHash) != 64 {
@@ -67,7 +69,21 @@ func (m Manifest) Validate() error {
 	if m.API == 1 && len(m.NetworkHosts) > 0 {
 		return errors.New("network permissions require API 2")
 	}
-	lists := [][]string{m.InputHosts, m.OutputHosts}
+	lists := [][]string{m.InputHosts}
+	if m.Capability == "url-resolver" {
+		if m.FeedURL != "" {
+			return errors.New("feed_url requires tracker-provider capability")
+		}
+		lists = append(lists, m.OutputHosts)
+	} else {
+		if m.API != 2 || len(m.OutputHosts) != 0 || len(m.NetworkHosts) == 0 {
+			return errors.New("tracker providers require API 2, declared network hosts and no output_hosts")
+		}
+		u, err := url.Parse(m.FeedURL)
+		if err != nil || len(m.FeedURL) > 2048 || strings.IndexFunc(m.FeedURL, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 || u.Scheme != "https" || u.User != nil || u.Fragment != "" || (u.Port() != "" && u.Port() != "443") || !permitted(m.FeedURL, m.InputHosts) || !permitted(m.FeedURL, m.NetworkHosts) {
+			return errors.New("declare an HTTPS feed_url on an approved input and network host")
+		}
+	}
 	if len(m.NetworkHosts) > 0 {
 		lists = append(lists, m.NetworkHosts)
 	}

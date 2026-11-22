@@ -74,6 +74,17 @@ func (a *App) addonsAPI(w http.ResponseWriter, r *http.Request) {
 			respond(w, map[string]any{"urls": urls})
 			return
 		}
+	case "/api/addons/trackers":
+		if in.URL != "" {
+			http.Error(w, "tracker providers use their signed feed URL; no input link is accepted", 400)
+			return
+		}
+		var trackers []string
+		trackers, err = a.addons.FetchTrackers(r.Context(), in.ID, addons.ResolveApproval{Network: in.NetworkApproved, Digest: in.Digest})
+		if err == nil {
+			respond(w, map[string]any{"trackers": trackers, "addonId": in.ID, "packageDigest": in.Digest})
+			return
+		}
 	default:
 		http.Error(w, "not found", 404)
 		return

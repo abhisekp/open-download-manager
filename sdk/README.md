@@ -1,6 +1,6 @@
 # ODM add-on SDK — APIs 1 and 2
 
-Original SDK code is MIT licensed. APIs 1 and 2 support signed `url-resolver` modules using WASI Preview 1. API 2 adds separately approved [provider HTTPS requests](NETWORK.md). This is separate from browser companion extensions and the legacy built-in tracker feed. Provider credentials, arbitrary UI contributions, storage, event subscriptions and automatic update distribution remain separate milestones.
+Original SDK code is MIT licensed. APIs 1 and 2 support signed `url-resolver` modules using WASI Preview 1. API 2 also supports [signed tracker providers](TRACKER-PROVIDERS.md), including an original newTrackon example. API 2 adds separately approved [provider HTTPS requests](NETWORK.md). This is separate from browser companion extensions and the legacy built-in tracker feed. Provider credentials, arbitrary UI contributions, storage, event subscriptions and automatic update distribution remain separate milestones.
 
 ## Contract
 

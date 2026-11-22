@@ -691,9 +691,9 @@ export function App() {
               </>
             )}
             <div className="boundary">
-              <h3>Extension API v1</h3>
+              <h3>Application add-on SDK</h3>
               <p>
-                Signed local URL resolvers run in an isolated worker with
+                Signed local URL resolvers and tracker providers run in isolated workers with
                 reviewed host permissions. The built-in tracker feed has a
                 separate network grant. Shell commands and unrestricted scripts
                 are not supported.

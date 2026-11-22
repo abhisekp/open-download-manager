@@ -1,0 +1,12 @@
+{
+  "api": 2,
+  "id": "org.odm.newtrackon",
+  "name": "newTrackon live tracker provider",
+  "version": "1.0.0",
+  "description": "Fetches up to 128 tracker suggestions from newTrackon's public live feed. Fetching does not contact the suggested trackers or modify any torrent. Review tracker URLs separately before applying them to a public torrent.",
+  "capability": "tracker-provider",
+  "input_hosts": ["newtrackon.com"],
+  "output_hosts": [],
+  "network_hosts": ["newtrackon.com"],
+  "feed_url": "https://newtrackon.com/api/live"
+}
